@@ -1,15 +1,24 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.database import get_db
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+from app.core.config import CORS_ORIGINS
+from app.api import auth, sessions, tasks
 
-@app.get("/health")
-def health():
+app = FastAPI(title="AI Work Stress Simulator API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
+app.include_router(tasks.router, tags=["tasks"])
+
+
+@app.get("/health", tags=["health"])
+def health_check():
     return {"status": "ok"}
-
-@app.get("/db-check")
-def db_check(db: Session = Depends(get_db)):
-    result = db.execute(text("SELECT 1"))
-    return {"db_connected": result.scalar() == 1}
