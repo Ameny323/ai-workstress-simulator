@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --background: #F5F7FA;
+  --foreground: #1A2B3C;
+  --card: rgba(255, 255, 255, 0.85);
+  --card-foreground: #1A2B3C;
+  --primary: #5B84C6;
+  --primary-foreground: #ffffff;
+  --secondary: #8D74FF;
+  --secondary-foreground: #ffffff;
+  --muted: #EEF1F6;
+  --muted-foreground: #6B7A8D;
+  --accent: #5B84C6;
+  --accent-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.06);
+  --ring: rgba(91, 132, 198, 0.3);
+  --radius: 12px;
+  --sidebar: #27435D;
+  --sidebar-foreground: rgba(255, 255, 255, 0.85);
+  --sidebar-muted: rgba(255, 255, 255, 0.45);
+  --sidebar-active: rgba(255, 255, 255, 0.12);
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.glass-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07), 0 8px 24px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+/* Sidebar nav item */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--sidebar-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+.nav-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-foreground);
+}
+.nav-item.active {
+  background: var(--sidebar-active);
+  color: #ffffff;
+}
+
+/* Slider */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 2px 6px rgba(91, 132, 198, 0.4);
+  border: 2px solid white;
+  transition: transform 0.15s ease;
+}
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* Typing dots animation */
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.typing-dot:nth-child(1) { animation: typing-dot 1.2s 0s infinite; }
+.typing-dot:nth-child(2) { animation: typing-dot 1.2s 0.2s infinite; }
+.typing-dot:nth-child(3) { animation: typing-dot 1.2s 0.4s infinite; }
+
+/* Pulse badge */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(91, 132, 198, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(91, 132, 198, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(91, 132, 198, 0); }
+}
+.pulse-badge {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.35s ease forwards;
+}
