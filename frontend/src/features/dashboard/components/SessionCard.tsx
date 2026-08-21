@@ -24,6 +24,7 @@ export default function SessionCard() {
   const totalTime = session.elapsedTime + session.remainingTime;
   const progress = totalTime > 0 ? (session.elapsedTime / totalTime) * 100 : 0;
   const phaseIdx = PHASE_ORDER.indexOf(session.phase);
+  const isIdle = session.state === "idle";
 
   return (
     <div className="glass-card" style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -33,7 +34,7 @@ export default function SessionCard() {
             Session
           </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2B3C", letterSpacing: "-0.01em" }}>
-            {session.id}
+            {session.id || "Awaiting start"}
           </div>
         </div>
         <div
@@ -56,21 +57,23 @@ export default function SessionCard() {
 
       <div style={{ textAlign: "center", padding: "8px 0" }}>
         <div style={{ fontSize: 36, fontWeight: 800, color: "#1A2B3C", letterSpacing: "-0.05em", lineHeight: 1 }}>
-          {formatDuration(session.elapsedTime)}
+          {isIdle ? "00:00" : formatDuration(session.elapsedTime)}
         </div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 5, fontWeight: 500 }}>elapsed</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 5, fontWeight: 500 }}>
+          {isIdle ? "No session active yet" : "elapsed"}
+        </div>
       </div>
 
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
           <span style={{ fontSize: 11.5, color: "#6B7A8D", fontWeight: 500 }}>Session progress</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1A2B3C" }}>{Math.round(progress)}%</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1A2B3C" }}>{isIdle ? 0 : Math.round(progress)}%</span>
         </div>
         <div style={{ height: 6, borderRadius: 99, background: "#EEF1F6", overflow: "hidden" }}>
           <div
             style={{
               height: "100%",
-              width: `${progress}%`,
+              width: `${isIdle ? 0 : progress}%`,
               borderRadius: 99,
               background: "linear-gradient(90deg, #5B84C6, #8D74FF)",
               transition: "width 1s linear",
@@ -111,7 +114,7 @@ export default function SessionCard() {
           ))}
         </div>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#5B84C6", marginTop: 5 }}>
-          {PHASE_LABELS[session.phase]}
+          {isIdle ? "Waiting to start" : PHASE_LABELS[session.phase]}
         </div>
       </div>
 
@@ -129,13 +132,13 @@ export default function SessionCard() {
         <div>
           <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>Remaining</div>
           <div style={{ fontSize: 14, fontWeight: 800, color: "#1A2B3C", letterSpacing: "-0.02em" }}>
-            {formatDuration(session.remainingTime)}
+            {isIdle ? "--:--" : formatDuration(session.remainingTime)}
           </div>
         </div>
         <div>
           <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>Tasks Done</div>
           <div style={{ fontSize: 14, fontWeight: 800, color: "#1A2B3C", letterSpacing: "-0.02em" }}>
-            3 / 7
+            {isIdle ? "0 / 0" : "3 / 7"}
           </div>
         </div>
       </div>

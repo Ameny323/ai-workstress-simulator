@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import StatCard from "@/components/ui/StatCard";
 import AiMonitorIllustration from "@/components/illustrations/AiMonitorIllustration";
+import { useApp } from "../../contexts/AppContext";
 import { login } from "./authApi";
 
 function useLogo(raw: string) {
@@ -22,7 +23,8 @@ function useLogo(raw: string) {
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  
+  const { startSimulation } = useApp();
+
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
@@ -37,6 +39,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login({ email, password });
+      await startSimulation();
       navigate("/bureau");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");

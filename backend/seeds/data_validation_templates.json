@@ -1,0 +1,56 @@
+[
+  {
+    "title": "Verify New Client Contact List",
+    "description": "A batch of newly imported client records needs a quick pass before they go into the CRM. Check each one and flag anything that looks broken.",
+    "task_type": "data_validation",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 300,
+    "default_priority": "low",
+    "instructions": "Review each record below. Check the box next to any record whose email or phone number is malformed.",
+    "metadata": {
+      "row_count": 8,
+      "record_pool": {
+        "field_names": ["Name", "Email", "Phone"],
+        "error_rate": 0.3
+      }
+    },
+    "is_active": true
+  },
+  {
+    "title": "Validate New Hire Onboarding Records",
+    "description": "HR just handed off a short list of new hire contact details. Some entries were typed in a hurry — catch the mistakes before they're filed.",
+    "task_type": "data_validation",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 240,
+    "default_priority": "low",
+    "instructions": "Review each record below. Check the box next to any record whose email or phone number is malformed.",
+    "metadata": {
+      "row_count": 8,
+      "record_pool": {
+        "field_names": ["Name", "Email", "Phone"],
+        "error_rate": 0.25
+      }
+    },
+    "is_active": true
+  },
+  {
+    "title": "Clean Up Newsletter Signup Batch",
+    "description": "A fresh batch of newsletter signups came in overnight. Skim the list and mark the records that won't be deliverable as-is.",
+    "task_type": "data_validation",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 360,
+    "default_priority": "medium",
+    "instructions": "Review each record below. Check the box next to any record whose email or phone number is malformed.",
+    "metadata": {
+      "row_count": 10,
+      "record_pool": {
+        "field_names": ["Name", "Email", "Phone"],
+        "error_rate": 0.4
+      }
+    },
+    "is_active": true
+  }
+]

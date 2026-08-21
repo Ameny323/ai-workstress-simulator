@@ -17,12 +17,6 @@ const TYPE_LABELS: Record<string, string> = {
   design: "Design",
 };
 
-const MOCK_ATTACHMENTS = [
-  { name: "Q3_Revenue_Data.xlsx", size: "2.4 MB", icon: "📊" },
-  { name: "Variance_Notes.pdf", size: "840 KB", icon: "📄" },
-  { name: "Stakeholder_Brief.docx", size: "1.1 MB", icon: "📝" },
-];
-
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "Overdue";
   const h = Math.floor(ms / 3600000);
@@ -33,9 +27,10 @@ function formatCountdown(ms: number): string {
 }
 
 export default function TaskCard() {
-  const { currentTask, completeTask } = useApp();
+  const { currentTask, completeTask, session, startSimulation } = useApp();
   const [completing, setCompleting] = useState(false);
   const priority = PRIORITY_CONFIG[currentTask.priority];
+  const isIdle = session.state === "idle";
   const timeLeft = currentTask.deadline.getTime() - Date.now();
   const isUrgent = timeLeft < 6 * 3600 * 1000;
   const countdown = formatCountdown(timeLeft);
@@ -53,6 +48,46 @@ export default function TaskCard() {
       setCompleting(false);
     }, 800);
   };
+
+  if (isIdle || !currentTask.id) {
+    return (
+      <div
+        className="glass-card"
+        style={{
+          padding: "24px 28px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          alignItems: "flex-start",
+          border: "1px dashed rgba(91,132,198,0.24)",
+        }}
+      >
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#5B84C6", textTransform: "uppercase", letterSpacing: "0.09em" }}>
+          Current Task
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A2B3C", margin: 0, letterSpacing: "-0.025em" }}>
+          No task assigned yet
+        </h2>
+        <p style={{ margin: 0, fontSize: 13.5, color: "#4B5A6A", lineHeight: 1.6 }}>
+          Start a simulation to receive your first task and unlock the active workspace.
+        </p>
+        <button
+          onClick={() => void startSimulation()}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            border: "none",
+            background: "linear-gradient(135deg, #5B84C6, #8D74FF)",
+            color: "white",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Start Simulation
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -230,83 +265,27 @@ export default function TaskCard() {
       </div>
 
       <div>
-        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#6B7A8D", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-          Attachments
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {MOCK_ATTACHMENTS.map((file) => (
-            <div
-              key={file.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "8px 12px",
-                borderRadius: 8,
-                background: "rgba(0,0,0,0.025)",
-                border: "1px solid rgba(0,0,0,0.05)",
-                cursor: "pointer",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(91,132,198,0.06)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(0,0,0,0.025)"; }}
-            >
-              <span style={{ fontSize: 14 }}>{file.icon}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 500, color: "#1A2B3C", flex: 1 }}>{file.name}</span>
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>{file.size}</span>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth={2}>
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </div>
-          ))}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            Actions
+          </span>
+          <button
+            onClick={handleComplete}
+            disabled={completing}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid rgba(91,132,198,0.2)",
+              background: "rgba(91,132,198,0.08)",
+              color: "#5B84C6",
+              fontWeight: 700,
+              cursor: completing ? "wait" : "pointer",
+            }}
+          >
+            {completing ? "Completing..." : "Complete Task"}
+          </button>
         </div>
       </div>
-
-      <button
-        onClick={handleComplete}
-        disabled={completing}
-        style={{
-          padding: "13px 0",
-          background: completing ? "rgba(34,197,94,0.15)" : "linear-gradient(135deg, #5B84C6 0%, #8D74FF 100%)",
-          color: completing ? "#16a34a" : "white",
-          fontWeight: 700,
-          fontSize: 14,
-          borderRadius: 12,
-          border: "none",
-          cursor: completing ? "default" : "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          transition: "all 0.25s ease",
-          letterSpacing: "-0.01em",
-          boxShadow: completing ? "none" : "0 4px 14px rgba(91,132,198,0.3)",
-        }}
-        onMouseEnter={(e) => {
-          if (!completing) (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.opacity = "1";
-        }}
-      >
-        {completing ? (
-          <>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Marking Complete…
-          </>
-        ) : (
-          <>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Mark as Complete
-          </>
-        )}
-      </button>
     </div>
   );
 }

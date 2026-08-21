@@ -2,7 +2,6 @@ export type SimulationState = "idle" | "running" | "paused" | "finished";
 export type SimulationPhase = "onboarding" | "warmup" | "peak" | "cooldown" | "review";
 export type PressureLevel = "very_low" | "low" | "moderate" | "high" | "very_high";
 export type ManagerMode = "supportive" | "professional" | "demanding" | "strict" | "micromanager";
-export type StressLevel = 1 | 2 | 3 | 4 | 5;
 export type TaskPriority = "low" | "medium" | "high" | "critical";
 export type TaskType = "analysis" | "report" | "review" | "meeting" | "research" | "design";
 export type NavSection =

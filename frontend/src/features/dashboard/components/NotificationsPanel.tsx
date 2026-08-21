@@ -50,9 +50,10 @@ const TYPE_CONFIG: Record<Notification["type"], { icon: ReactNode; color: string
 };
 
 export default function NotificationsPanel() {
-  const { notifications } = useApp();
+  const { notifications, session } = useApp();
   const unread = notifications.filter((n) => !n.read);
   const recent = notifications.slice(0, 4);
+  const isIdle = session.state === "idle";
 
   return (
     <div className="glass-card" style={{ padding: "16px 22px" }}>
@@ -81,69 +82,75 @@ export default function NotificationsPanel() {
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        {recent.map((n) => {
-          const conf = TYPE_CONFIG[n.type];
-          return (
-            <div
-              key={n.id}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: n.read ? "rgba(0,0,0,0.02)" : "rgba(91,132,198,0.04)",
-                border: n.read ? "1px solid rgba(0,0,0,0.05)" : "1px solid rgba(91,132,198,0.12)",
-                cursor: "pointer",
-                transition: "background 0.15s",
-                position: "relative",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(91,132,198,0.07)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = n.read ? "rgba(0,0,0,0.02)" : "rgba(91,132,198,0.04)"; }}
-            >
-              {!n.read && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "#5B84C6",
-                    display: "block",
-                  }}
-                />
-              )}
+      {isIdle ? (
+        <div style={{ padding: "16px", borderRadius: 10, background: "rgba(0,0,0,0.025)", border: "1px dashed rgba(0,0,0,0.08)", color: "#6B7A8D", fontSize: 13 }}>
+          No activity yet. Start a simulation to generate your first notifications and timeline events.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+          {recent.map((n) => {
+            const conf = TYPE_CONFIG[n.type];
+            return (
               <div
+                key={n.id}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 7,
-                  background: conf.bg,
-                  color: conf.color,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 8,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: n.read ? "rgba(0,0,0,0.02)" : "rgba(91,132,198,0.04)",
+                  border: n.read ? "1px solid rgba(0,0,0,0.05)" : "1px solid rgba(91,132,198,0.12)",
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                  position: "relative",
                 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(91,132,198,0.07)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = n.read ? "rgba(0,0,0,0.02)" : "rgba(91,132,198,0.04)"; }}
               >
-                {conf.icon}
+                {!n.read && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      right: 10,
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#5B84C6",
+                      display: "block",
+                    }}
+                  />
+                )}
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: conf.bg,
+                    color: conf.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  {conf.icon}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>
+                  {conf.label}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1A2B3C", lineHeight: 1.35, marginBottom: 4 }}>
+                  {n.title}
+                </div>
+                <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.4, marginBottom: 5 }}>
+                  {n.description}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 500 }}>
+                  {formatRelativeTime(n.timestamp)}
+                </div>
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>
-                {conf.label}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A2B3C", lineHeight: 1.35, marginBottom: 4 }}>
-                {n.title}
-              </div>
-              <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.4, marginBottom: 5 }}>
-                {n.description}
-              </div>
-              <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 500 }}>
-                {formatRelativeTime(n.timestamp)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

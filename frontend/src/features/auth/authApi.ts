@@ -1,5 +1,3 @@
-// src/features/auth/authApi.ts — network calls only, no JSX, no useState
-
 import { BASE_URL, setToken } from "@/api/client";
 
 export interface LoginPayload {

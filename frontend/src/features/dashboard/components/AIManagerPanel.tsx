@@ -27,9 +27,10 @@ const urgencyColor: Record<string, string> = {
 };
 
 export default function AIManagerPanel() {
-  const { managerMode, pressureScore, isTyping } = useApp();
+  const { managerMode, pressureScore, isTyping, session } = useApp();
   const modeConf = MODE_CONFIG[managerMode] ?? MODE_CONFIG.professional;
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const isIdle = session.state === "idle";
 
   const handleAction = (action: string) => {
     setActiveAction(action);
@@ -38,6 +39,31 @@ export default function AIManagerPanel() {
 
   const pressureColor = pressureScore > 75 ? "#ef4444" : pressureScore > 50 ? "#f97316" : pressureScore > 30 ? "#f59e0b" : "#22c55e";
   const pressureLabel = pressureScore > 75 ? "Critical" : pressureScore > 50 ? "High" : pressureScore > 30 ? "Moderate" : "Low";
+
+  if (isIdle) {
+    return (
+      <div
+        className="glass-card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          padding: "24px 22px",
+          gap: 12,
+          border: "1px dashed rgba(91,132,198,0.24)",
+        }}
+      >
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#5B84C6", textTransform: "uppercase", letterSpacing: "0.09em" }}>
+          AI Supervisor
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A2B3C", margin: 0 }}>
+          Waiting for simulation...
+        </h2>
+        <p style={{ margin: 0, fontSize: 13.5, color: "#4B5A6A", lineHeight: 1.6 }}>
+          Once you start a session, ARIA will issue directives, track pressure, and guide the experience.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

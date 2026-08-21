@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.session import Session
 from app.models.task import Task
+from app.models.task_template import TaskTemplate
 from app.models.manager_message import ManagerMessage
 from app.models.interaction_metric import InteractionMetric
 from app.models.stress_declaration import StressDeclaration
@@ -12,6 +13,7 @@ __all__ = [
     "User",
     "Session",
     "Task",
+    "TaskTemplate",
     "ManagerMessage",
     "InteractionMetric",
     "StressDeclaration",

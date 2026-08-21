@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { NavSection } from "../../types";
 import { useApp } from "../../contexts/AppContext";
+import { clearToken } from "../../api/client";
 
 interface NavItem {
   id: NavSection | "logout";
@@ -106,6 +107,11 @@ const BOTTOM_NAV: NavItem[] = [
 export default function Sidebar() {
   const { activeNav, setActiveNav } = useApp();
 
+  const handleLogout = () => {
+    clearToken();
+    window.location.href = "/login";
+  };
+
   return (
     <aside
       style={{
@@ -197,7 +203,8 @@ export default function Sidebar() {
           <button
             key={item.id}
             className="nav-item"
-            style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}
+            onClick={item.id === "logout" ? handleLogout : undefined}
+            style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer" }}
           >
             <span style={{ opacity: 0.6 }}>{item.icon}</span>
             <span>{item.label}</span>

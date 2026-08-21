@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { apiRequest } from "../api/client";
 import type {
   User,
   Session,
@@ -8,8 +9,9 @@ import type {
   PerformanceMetrics,
   TimelineEvent,
   ManagerMode,
-  StressLevel,
   NavSection,
+  SimulationPhase,
+  SimulationState,
 } from "../types";
 
 interface AppContextValue {
@@ -22,12 +24,10 @@ interface AppContextValue {
   timeline: TimelineEvent[];
   managerMode: ManagerMode;
   pressureScore: number;
-  stressLevel: StressLevel;
   isTyping: boolean;
   activeNav: NavSection;
-  setStressLevel: (level: StressLevel) => void;
   setActiveNav: (nav: NavSection) => void;
-  startSimulation: () => void;
+  startSimulation: () => Promise<void>;
   pauseSimulation: () => void;
   resumeSimulation: () => void;
   finishSession: () => void;
@@ -43,143 +43,70 @@ const MOCK_USER: User = {
   role: "Senior Analyst",
 };
 
-const MOCK_SESSION: Session = {
-  id: "SIM-2025-0728-04",
-  phase: "peak",
-  elapsedTime: 4320,
-  remainingTime: 2880,
-  state: "running",
-  startedAt: new Date(Date.now() - 4320 * 1000),
+const EMPTY_SESSION: Session = {
+  id: "",
+  phase: "onboarding",
+  elapsedTime: 0,
+  remainingTime: 0,
+  state: "idle",
+  startedAt: new Date(),
 };
 
-const MOCK_TASK: Task = {
-  id: "t_09",
-  title: "Quarterly Performance Analysis Report",
-  type: "report",
-  priority: "high",
-  deadline: new Date(Date.now() + 48 * 60 * 60 * 1000),
-  progress: 62,
-  estimatedDuration: 90,
+const EMPTY_TASK: Task = {
+  id: "",
+  title: "No task assigned yet",
+  type: "analysis",
+  priority: "medium",
+  deadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  progress: 0,
+  estimatedDuration: 0,
 };
 
-const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: "m_01",
-    role: "manager",
-    content:
-      "Good morning, Alex. Today's priority is the Q3 performance analysis. I expect a first draft by 14:00. Focus on the revenue variance section — there are discrepancies we need addressed.",
-    timestamp: new Date(Date.now() - 3600 * 1000),
-  },
-  {
-    id: "m_02",
-    role: "user",
-    content: "Understood. I've already pulled the data. I'll have the draft ready well before the deadline.",
-    timestamp: new Date(Date.now() - 3540 * 1000),
-  },
-  {
-    id: "m_03",
-    role: "manager",
-    content:
-      "Good. Also note: the deadline for the stakeholder summary has been moved up. I need that by end of day, not tomorrow. Please adjust your schedule accordingly.",
-    timestamp: new Date(Date.now() - 1800 * 1000),
-  },
-  {
-    id: "m_04",
-    role: "manager",
-    content:
-      "Current progress is at 62%. You are slightly behind the expected pace for this phase. Please increase output or flag any blockers immediately.",
-    timestamp: new Date(Date.now() - 600 * 1000),
-  },
-];
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "n_01",
-    type: "task_assigned",
-    title: "New Task Assigned",
-    description: "Stakeholder Executive Summary — due today at 17:30",
-    timestamp: new Date(Date.now() - 1800 * 1000),
-    read: false,
-  },
-  {
-    id: "n_02",
-    type: "deadline_reduced",
-    title: "Deadline Reduced",
-    description: "Q3 Performance Report moved from tomorrow to 14:00 today",
-    timestamp: new Date(Date.now() - 3200 * 1000),
-    read: false,
-  },
-  {
-    id: "n_03",
-    type: "pressure_increased",
-    title: "Pressure Level Increased",
-    description: "Session pressure elevated from Moderate to High",
-    timestamp: new Date(Date.now() - 5400 * 1000),
-    read: true,
-  },
-  {
-    id: "n_04",
-    type: "reminder",
-    title: "Check-in Reminder",
-    description: "AI Manager check-in scheduled in 15 minutes",
-    timestamp: new Date(Date.now() - 7200 * 1000),
-    read: true,
-  },
-];
-
-const MOCK_METRICS: PerformanceMetrics = {
-  productivity: 78,
-  fatigue: 34,
-  responseTime: 4.2,
-  errorRate: 2.1,
+const EMPTY_METRICS: PerformanceMetrics = {
+  productivity: 0,
+  fatigue: 0,
+  responseTime: 0,
+  errorRate: 0,
 };
 
-const MOCK_TIMELINE: TimelineEvent[] = [
-  {
-    id: "tl_05",
-    type: "manager_message",
-    title: "Manager check-in",
-    description: "Progress update requested — current pace flagged",
-    timestamp: new Date(Date.now() - 600 * 1000),
-  },
-  {
-    id: "tl_04",
-    type: "stress_declared",
-    title: "Stress declared",
-    description: "Level set to Moderate by user",
-    timestamp: new Date(Date.now() - 2400 * 1000),
-  },
-  {
-    id: "tl_03",
-    type: "task_assigned",
-    title: "Task assigned",
-    description: "Stakeholder Executive Summary added to queue",
-    timestamp: new Date(Date.now() - 1800 * 1000),
-  },
-  {
-    id: "tl_02",
-    type: "task_completed",
-    title: "Task completed",
-    description: "Data extraction & normalization — 100%",
-    timestamp: new Date(Date.now() - 3600 * 1000),
-  },
-  {
-    id: "tl_01",
-    type: "manager_message",
-    title: "Session briefing",
-    description: "AI Manager issued daily priorities and expectations",
-    timestamp: new Date(Date.now() - 4320 * 1000),
-  },
-];
+function toFrontendPhase(phase?: string): SimulationPhase {
+  switch (phase) {
+    case "accueil":
+      return "onboarding";
+    case "montee_pression":
+      return "warmup";
+    case "pic_charge":
+      return "peak";
+    case "debriefing":
+      return "review";
+    default:
+      return "onboarding";
+  }
+}
+
+function toFrontendState(status?: string): SimulationState {
+  switch (status) {
+    case "in_progress":
+      return "running";
+    case "completed":
+    case "abandoned":
+      return "finished";
+    default:
+      return "idle";
+  }
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session>(MOCK_SESSION);
-  const [stressLevel, setStressLevelState] = useState<StressLevel>(3);
+  const [session, setSession] = useState<Session>(EMPTY_SESSION);
+  const [currentTask, setCurrentTask] = useState<Task>(EMPTY_TASK);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [metrics, setMetrics] = useState<PerformanceMetrics>(EMPTY_METRICS);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [activeNav, setActiveNav] = useState<NavSection>("dashboard");
   const [isTyping, setIsTyping] = useState(false);
-  const [messages] = useState<ChatMessage[]>(MOCK_MESSAGES);
-  const managerMode: ManagerMode = "demanding";
-  const pressureScore = 67;
+  const [managerMode] = useState<ManagerMode>("professional");
+  const [pressureScore, setPressureScore] = useState(0);
 
   useEffect(() => {
     if (session.state !== "running") return;
@@ -201,27 +128,155 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(cycle);
   }, []);
 
-  const startSimulation = () => setSession((s) => ({ ...s, state: "running" }));
+  const startSimulation = async () => {
+    try {
+      const createdSession = await apiRequest<{
+        id: string;
+        user_id: string;
+        started_at: string;
+        ended_at: string | null;
+        current_phase: string;
+        status: string;
+      }> ("/sessions/", { method: "POST" });
+
+      const taskDeadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
+      const createdTask = await apiRequest<{
+        id: string;
+        session_id: string;
+        type: string;
+        title: string;
+        description: string | null;
+        assigned_at: string;
+        deadline: string | null;
+        completed_at: string | null;
+        status: string;
+        priority: string;
+        error_count: number;
+      }>(`/sessions/${createdSession.id}/tasks`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: "validation_donnees",
+          title: "Initial planning review",
+          description: "Prepare the first response for the current workload.",
+          deadline: taskDeadline.toISOString(),
+          priority: "normal",
+        }),
+      });
+
+      const nextSession: Session = {
+        id: createdSession.id,
+        phase: toFrontendPhase(createdSession.current_phase),
+        elapsedTime: 0,
+        remainingTime: 60 * 60 * 3,
+        state: toFrontendState(createdSession.status),
+        startedAt: new Date(createdSession.started_at),
+      };
+
+      const nextTask: Task = {
+        id: createdTask.id,
+        title: createdTask.title,
+        type: "analysis",
+        priority: createdTask.priority === "urgent" ? "high" : "medium",
+        deadline: createdTask.deadline ? new Date(createdTask.deadline) : new Date(Date.now() + 4 * 60 * 60 * 1000),
+        progress: 0,
+        estimatedDuration: 45,
+      };
+
+      setSession(nextSession);
+      setCurrentTask(nextTask);
+      setMessages([
+        {
+          id: "welcome",
+          role: "manager",
+          content: "Simulation started. Review the task, monitor the pressure, and keep your pace steady.",
+          timestamp: new Date(),
+        },
+      ]);
+      setNotifications([
+        {
+          id: "welcome-note",
+          type: "task_assigned",
+          title: "Simulation started",
+          description: "Your first task has been assigned and the dashboard has been activated.",
+          timestamp: new Date(),
+          read: false,
+        },
+      ]);
+      setMetrics({ productivity: 62, fatigue: 24, responseTime: 3.8, errorRate: 1.4 });
+      setTimeline([
+        {
+          id: "timeline-start",
+          type: "task_assigned",
+          title: "Session launched",
+          description: "A new simulation session is now active.",
+          timestamp: new Date(),
+        },
+      ]);
+      setPressureScore(24);
+    } catch (error) {
+      console.error("Could not start simulation", error);
+      setSession({ ...EMPTY_SESSION, state: "running", phase: "onboarding", remainingTime: 60 * 60 * 3 });
+      setCurrentTask({ ...EMPTY_TASK, id: "fallback-task", title: "Fallback planning task", priority: "medium", estimatedDuration: 30, progress: 0 });
+      setMessages([
+        {
+          id: "fallback-welcome",
+          role: "manager",
+          content: "The backend is unavailable, so the dashboard is using a fallback session for now.",
+          timestamp: new Date(),
+        },
+      ]);
+      setNotifications([
+        {
+          id: "fallback-note",
+          type: "reminder",
+          title: "Fallback mode",
+          description: "The app is running locally until the API is reachable.",
+          timestamp: new Date(),
+          read: false,
+        },
+      ]);
+      setMetrics({ productivity: 48, fatigue: 18, responseTime: 4.4, errorRate: 2.2 });
+      setTimeline([
+        {
+          id: "timeline-fallback",
+          type: "manager_message",
+          title: "Fallback session",
+          description: "The local experience is now active.",
+          timestamp: new Date(),
+        },
+      ]);
+      setPressureScore(20);
+    }
+  };
+
   const pauseSimulation = () => setSession((s) => ({ ...s, state: "paused" }));
   const resumeSimulation = () => setSession((s) => ({ ...s, state: "running" }));
   const finishSession = () => setSession((s) => ({ ...s, state: "finished" }));
-  const completeTask = () => {};
-  const setStressLevel = (level: StressLevel) => setStressLevelState(level);
-
+  const completeTask = () => {
+    setCurrentTask((task) => ({ ...task, progress: 100 }));
+    setTimeline((events) => [
+      {
+        id: `timeline-${Date.now()}`,
+        type: "task_completed",
+        title: "Task completed",
+        description: "The current task has been marked complete.",
+        timestamp: new Date(),
+      },
+      ...events,
+    ]);
+  };
   const value: AppContextValue = {
     user: MOCK_USER,
     session,
-    currentTask: MOCK_TASK,
+    currentTask,
     messages,
-    notifications: MOCK_NOTIFICATIONS,
-    metrics: MOCK_METRICS,
-    timeline: MOCK_TIMELINE,
+    notifications,
+    metrics,
+    timeline,
     managerMode,
     pressureScore,
-    stressLevel,
     isTyping,
     activeNav,
-    setStressLevel,
     setActiveNav,
     startSimulation,
     pauseSimulation,

@@ -15,10 +15,10 @@ class SessionStatus(str, enum.Enum):
 
 
 class TaskType(str, enum.Enum):
-    validation_donnees = "validation_donnees"
-    classement_documents = "classement_documents"
-    redaction_courriel = "redaction_courriel"
-    demande_urgente = "demande_urgente"
+    data_validation = "data_validation"
+    document_organization = "document_organization"
+    email_writing = "email_writing"
+    urgent_request = "urgent_request"
 
 
 class TaskStatus(str, enum.Enum):
@@ -28,8 +28,16 @@ class TaskStatus(str, enum.Enum):
     expired = "expired"
 
 
+class TaskDifficulty(str, enum.Enum):
+    easy = "easy"
+    medium = "medium"
+    hard = "hard"
+
+
 class Priority(str, enum.Enum):
-    normal = "normal"
+    low = "low"
+    medium = "medium"
+    high = "high"
     urgent = "urgent"
 
 
