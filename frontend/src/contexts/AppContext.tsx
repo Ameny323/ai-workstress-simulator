@@ -155,11 +155,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }>(`/sessions/${createdSession.id}/tasks`, {
         method: "POST",
         body: JSON.stringify({
-          type: "validation_donnees",
+          type: "data_validation",
           title: "Initial planning review",
           description: "Prepare the first response for the current workload.",
           deadline: taskDeadline.toISOString(),
-          priority: "normal",
+          priority: "medium",
         }),
       });
 
