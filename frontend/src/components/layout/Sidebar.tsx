@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { NavSection } from "../../types";
 import { useApp } from "../../contexts/AppContext";
 import { clearToken } from "../../api/client";
+
+const NAV_ROUTES: Partial<Record<NavSection, string>> = {
+  dashboard: "/bureau",
+  tasks: "/tasks",
+};
 
 interface NavItem {
   id: NavSection | "logout";
@@ -106,6 +112,13 @@ const BOTTOM_NAV: NavItem[] = [
 
 export default function Sidebar() {
   const { activeNav, setActiveNav } = useApp();
+  const navigate = useNavigate();
+
+  const handleNavClick = (id: NavSection) => {
+    setActiveNav(id);
+    const route = NAV_ROUTES[id];
+    if (route) navigate(route);
+  };
 
   const handleLogout = () => {
     clearToken();
@@ -172,7 +185,7 @@ export default function Sidebar() {
           <button
             key={item.id}
             className={`nav-item ${activeNav === item.id ? "active" : ""}`}
-            onClick={() => setActiveNav(item.id as NavSection)}
+            onClick={() => handleNavClick(item.id as NavSection)}
             style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}
           >
             <span style={{ opacity: activeNav === item.id ? 1 : 0.6 }}>{item.icon}</span>

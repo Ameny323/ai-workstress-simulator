@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import type {
   User,
@@ -97,6 +98,7 @@ function toFrontendState(status?: string): SimulationState {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session>(EMPTY_SESSION);
   const [currentTask, setCurrentTask] = useState<Task>(EMPTY_TASK);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -213,6 +215,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         },
       ]);
       setPressureScore(24);
+      navigate("/tasks");
     } catch (error) {
       console.error("Could not start simulation", error);
       setSession({ ...EMPTY_SESSION, state: "running", phase: "onboarding", remainingTime: 60 * 60 * 3 });
