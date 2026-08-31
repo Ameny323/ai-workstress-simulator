@@ -20,6 +20,7 @@ from app.models.task_template import TaskTemplate
 from app.orchestrators.adaptation import adjust_priority_and_deadline, resolve_difficulty_pool
 from app.orchestrators.performance_tracker import get_performance_snapshot
 from app.tasks.data_validation import generate_validation_instance
+from app.tasks.document_organization import generate_document_organization_instance
 
 # Fewer than this many completed tasks since the pool last actually changed
 # means the cooldown is still active — reuse the previous pool instead of
@@ -27,10 +28,11 @@ from app.tasks.data_validation import generate_validation_instance
 DIFFICULTY_COOLDOWN_TASKS = 2
 
 # One instance generator per task family. Add an entry here when a new
-# family (document_organization, email_writing, urgent_request) gets its
-# own generator module in app/tasks/.
+# family (email_writing, urgent_request) gets its own generator module in
+# app/tasks/.
 INSTANCE_GENERATORS = {
     TaskType.data_validation: generate_validation_instance,
+    TaskType.document_organization: generate_document_organization_instance,
 }
 
 
