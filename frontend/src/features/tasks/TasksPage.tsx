@@ -2,10 +2,29 @@ import { useEffect, useState } from "react";
 import { useApp } from "../../contexts/AppContext";
 import { apiRequest } from "@/api/client";
 import ValidationTask, { type ValidationTaskData } from "../dashboard/components/ValidationTask";
+import DocumentOrganizationTask, {
+  type DocumentOrganizationTaskData,
+} from "./components/DocumentOrganizationTask";
+
+// Fetched shape before we know which task family it is -- instance_data's
+// concrete shape varies by type, so it's narrowed via a cast once `type`
+// is checked below, same way each *TaskData interface documents its own
+// instance_data shape for its own family.
+interface RawTaskData {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  instance_data: unknown;
+  deadline_seconds: number | null;
+  priority: string;
+  difficulty: string | null;
+  status: string;
+}
 
 export default function TasksPage() {
   const { session } = useApp();
-  const [task, setTask] = useState<ValidationTaskData | null>(null);
+  const [task, setTask] = useState<RawTaskData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(0);
 
@@ -14,7 +33,7 @@ export default function TasksPage() {
     let cancelled = false;
     setError(null);
     setTask(null);
-    apiRequest<ValidationTaskData>(`/sessions/${session.id}/next-task`)
+    apiRequest<RawTaskData>(`/sessions/${session.id}/next-task`)
       .then((data) => {
         if (!cancelled) setTask(data);
       })
@@ -25,6 +44,11 @@ export default function TasksPage() {
       cancelled = true;
     };
   }, [session.id, session.state, requestId]);
+
+  const handleSubmitted = () => {
+    setTask(null);
+    setRequestId((n) => n + 1);
+  };
 
   return (
     <div
@@ -62,13 +86,12 @@ export default function TasksPage() {
           Loading task...
         </div>
       ) : task.type === "data_validation" ? (
-        <ValidationTask
+        <ValidationTask key={task.id} task={task as unknown as ValidationTaskData} onSubmitted={handleSubmitted} />
+      ) : task.type === "document_organization" ? (
+        <DocumentOrganizationTask
           key={task.id}
-          task={task}
-          onSubmitted={() => {
-            setTask(null);
-            setRequestId((n) => n + 1);
-          }}
+          task={task as unknown as DocumentOrganizationTaskData}
+          onSubmitted={handleSubmitted}
         />
       ) : (
         <div
@@ -77,13 +100,10 @@ export default function TasksPage() {
         >
           <div style={{ color: "#4B5A6A", fontSize: 13.5 }}>
             "{task.title}" is a <strong>{task.type}</strong> task — that type doesn't have a UI
-            built yet, only data_validation does.
+            built yet.
           </div>
           <button
-            onClick={() => {
-              setTask(null);
-              setRequestId((n) => n + 1);
-            }}
+            onClick={handleSubmitted}
             style={{
               alignSelf: "flex-start",
               padding: "8px 14px",
