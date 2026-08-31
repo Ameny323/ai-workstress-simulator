@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "@/api/client";
 
 interface ValidationRecord {
@@ -16,6 +16,7 @@ interface ValidationInstanceData {
 // (the backend's TaskOut schema), not the app's curated Task UI type.
 export interface ValidationTaskData {
   id: string;
+  type: string;
   title: string;
   description: string | null;
   instance_data: ValidationInstanceData;
@@ -30,12 +31,40 @@ interface ValidationTaskProps {
   onSubmitted?: () => void;
 }
 
+// Harder tasks get a shorter clock — that's the pressure ramp the
+// simulator is built around. Only used when the backend didn't already
+// send a deadline_seconds for this task.
+const DIFFICULTY_FALLBACK_SECONDS: Record<string, number> = {
+  easy: 300,
+  medium: 210,
+  hard: 120,
+};
+
+function resolveDurationSeconds(task: ValidationTaskData): number {
+  if (task.deadline_seconds && task.deadline_seconds > 0) return task.deadline_seconds;
+  const key = (task.difficulty ?? "medium").toLowerCase();
+  return DIFFICULTY_FALLBACK_SECONDS[key] ?? 240;
+}
+
+function formatClock(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
 export default function ValidationTask({ task, onSubmitted }: ValidationTaskProps) {
   const { columns, records } = task.instance_data;
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const totalSeconds = useMemo(() => resolveDurationSeconds(task), [task]);
+  const [remaining, setRemaining] = useState(totalSeconds);
+  const autoSubmitted = useRef(false);
+  const checkedRef = useRef(checked);
+  checkedRef.current = checked;
 
   const toggle = (recordId: number) => {
     if (submitted) return;
@@ -48,7 +77,7 @@ export default function ValidationTask({ task, onSubmitted }: ValidationTaskProp
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const flaggedIds = Object.entries(checked)
+      const flaggedIds = Object.entries(checkedRef.current)
         .filter(([, isFlagged]) => isFlagged)
         .map(([id]) => Number(id));
       await apiRequest(`/tasks/${task.id}/complete`, {
@@ -63,6 +92,26 @@ export default function ValidationTask({ task, onSubmitted }: ValidationTaskProp
       setSubmitting(false);
     }
   };
+
+  // Per-task countdown. When it hits zero the task is auto-submitted with
+  // whatever is currently flagged, then TasksPage moves on to the next one.
+  useEffect(() => {
+    if (submitted) return;
+    if (remaining <= 0) {
+      if (!autoSubmitted.current && !submitting) {
+        autoSubmitted.current = true;
+        void handleSubmit();
+      }
+      return;
+    }
+    const timer = setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, submitted, submitting]);
+
+  const timeRatio = totalSeconds > 0 ? remaining / totalSeconds : 1;
+  const timerColor = timeRatio <= 0.25 ? "#c0505a" : timeRatio <= 0.5 ? "#c98a2c" : "#5B84C6";
+  const timerBg = timeRatio <= 0.25 ? "rgba(192,80,90,0.1)" : timeRatio <= 0.5 ? "rgba(201,138,44,0.1)" : "rgba(91,132,198,0.08)";
 
   return (
     <div
@@ -87,20 +136,57 @@ export default function ValidationTask({ task, onSubmitted }: ValidationTaskProp
             {task.title}
           </h2>
         </div>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#5B84C6",
-            background: "rgba(91,132,198,0.08)",
-            padding: "5px 12px",
-            borderRadius: 99,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {flaggedCount} flagged
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: timerColor,
+              background: timerBg,
+              padding: "5px 12px",
+              borderRadius: 99,
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3.5 2" strokeLinecap="round" />
+            </svg>
+            {submitted ? "Done" : formatClock(remaining)}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#5B84C6",
+              background: "rgba(91,132,198,0.08)",
+              padding: "5px 12px",
+              borderRadius: 99,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {flaggedCount} flagged
+          </span>
+        </div>
       </div>
+
+      {!submitted && (
+        <div style={{ height: 4, borderRadius: 99, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+          <div
+            style={{
+              height: "100%",
+              width: `${Math.max(0, Math.min(100, timeRatio * 100))}%`,
+              background: timerColor,
+              borderRadius: 99,
+              transition: "width 1s linear, background 0.3s",
+            }}
+          />
+        </div>
+      )}
 
       {task.description && (
         <p style={{ margin: 0, fontSize: 13.5, color: "#4B5A6A", lineHeight: 1.6 }}>{task.description}</p>
@@ -169,7 +255,9 @@ export default function ValidationTask({ task, onSubmitted }: ValidationTaskProp
           {submitError
             ? submitError
             : submitted
-              ? "Submitted — waiting for the next task."
+              ? autoSubmitted.current
+                ? "Time's up — submitted automatically."
+                : "Submitted — waiting for the next task."
               : `${records.length} records, ${flaggedCount} flagged so far.`}
         </span>
         <button
