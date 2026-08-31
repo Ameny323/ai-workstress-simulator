@@ -1,0 +1,106 @@
+[
+  {
+    "title": "Match Team Members to Their Roles",
+    "description": "New avatars were added to the team directory without any bios attached. Match each person to the description of what they actually do.",
+    "task_type": "image_matching",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 240,
+    "default_priority": "low",
+    "instructions": "For each photo, select the description that matches that person.",
+    "metadata": {
+      "pair_count": 4,
+      "pool": [
+        {
+          "id": 1,
+          "label": "Jordan Alvarez",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan-Alvarez",
+          "description": "Handles vendor invoices and monthly budget reconciliation."
+        },
+        {
+          "id": 2,
+          "label": "Priya Nair",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya-Nair",
+          "description": "Leads onboarding sessions for new hires in their first week."
+        },
+        {
+          "id": 3,
+          "label": "Marcus Chen",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus-Chen",
+          "description": "Manages the shared drive and keeps the file structure organized."
+        },
+        {
+          "id": 4,
+          "label": "Elena Petrova",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Elena-Petrova",
+          "description": "Reviews vendor contracts before they go to legal for sign-off."
+        },
+        {
+          "id": 5,
+          "label": "Tariq Hassan",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Tariq-Hassan",
+          "description": "Runs the weekly analytics report for the marketing team."
+        },
+        {
+          "id": 6,
+          "label": "Sofia Moreau",
+          "image_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Sofia-Moreau",
+          "description": "Coordinates equipment requests and IT access approvals."
+        }
+      ]
+    },
+    "is_active": true
+  },
+  {
+    "title": "Match the Wildlife Photos to Their Descriptions",
+    "description": "A batch of stock wildlife photos came in without captions. Match each photo to the animal it actually shows.",
+    "task_type": "image_matching",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 300,
+    "default_priority": "low",
+    "instructions": "For each photo, select the description that correctly identifies the animal.",
+    "metadata": {
+      "pair_count": 4,
+      "pool": [
+        {
+          "id": 1,
+          "label": "Cat",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Cat_August_2010-4.jpg?width=400",
+          "description": "A small domesticated carnivorous mammal, often kept as a companion for its hunting instincts and low-maintenance care."
+        },
+        {
+          "id": 2,
+          "label": "Dog",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Blue_merle_koolie_short_coat_heading_sheep_(cropped).jpg?width=400",
+          "description": "A domesticated descendant of the wolf, bred over thousands of years for companionship, herding, and guarding."
+        },
+        {
+          "id": 3,
+          "label": "African elephant",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/178_Male_African_bush_elephant_in_Etosha_National_Park_Photo_by_Giles_Laurent.jpg?width=400",
+          "description": "The largest living land animal, native to sub-Saharan Africa, recognizable by its large ears and long tusks."
+        },
+        {
+          "id": 4,
+          "label": "Bald eagle",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Bald_eagle_about_to_fly_in_Alaska_(2016).jpg?width=400",
+          "description": "A large bird of prey native to North America and the national bird of the United States."
+        },
+        {
+          "id": 5,
+          "label": "Red fox",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Portrait_of_a_red_fox_in_Rautas_fj%C3%A4llurskog_(cropped).jpg?width=400",
+          "description": "The largest species of true fox, found across the Northern Hemisphere, known for its reddish coat and bushy tail."
+        },
+        {
+          "id": 6,
+          "label": "Giant panda",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Grosser_Panda.JPG?width=400",
+          "description": "A bear native to south central China, known for its black-and-white coat and near-exclusive bamboo diet."
+        }
+      ]
+    },
+    "is_active": true
+  }
+]
