@@ -42,3 +42,40 @@ def generate_matching_instance(metadata: dict) -> dict:
     random.shuffle(descriptions)
 
     return {"items": items, "descriptions": descriptions}
+
+
+def score_matching_submission(instance_data: dict, submission_data: dict) -> dict:
+    """Grade an image_matching submission against its ground truth.
+
+    instance_data: the task's generated content — instance_data["items"], each with
+        "id" (ground truth: the correctly-matching description shares this same id,
+        per generate_matching_instance above).
+    submission_data: what the user submitted — {"matches": {image_id: description_id}}.
+
+    An item is correct if the description_id the user picked for it equals
+    the item's own id — a per-item "does the chosen value equal the correct
+    value" comparison, not a binary flagged/not-flagged check. Structurally
+    this is the same shape document_organization's correct_category
+    comparison would use, not data_validation's is_valid check.
+
+    Returns {"content_score": int 0-100, "error_count": int, "correct_count": int,
+    "total_count": int}. No DB access — pure function, independently testable.
+    """
+    items = instance_data.get("items", [])
+    raw_matches = submission_data.get("matches", {})
+    # dict keys are always strings once round-tripped through JSON storage —
+    # normalize regardless of whether this is called with fresh Pydantic
+    # output (already int-keyed) or a value read back from the DB.
+    matches = {int(k): v for k, v in raw_matches.items()}
+
+    total_count = len(items)
+    correct_count = sum(1 for item in items if matches.get(item["id"]) == item["id"])
+    error_count = total_count - correct_count
+    content_score = round(100 * correct_count / total_count) if total_count else 0
+
+    return {
+        "content_score": content_score,
+        "error_count": error_count,
+        "correct_count": correct_count,
+        "total_count": total_count,
+    }

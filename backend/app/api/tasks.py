@@ -14,11 +14,13 @@ from app.models.enums import TaskStatus, TaskType
 from app.schemas.task import TaskCreate, TaskOut, TaskCompleteRequest, TaskSubmissionRequest
 from app.orchestrators.task_engine import TaskEngine, NoTemplateAvailable
 from app.tasks.data_validation import score_validation_submission
+from app.tasks.image_matching import score_matching_submission
 
-# One scorer per task family. Only data_validation is implemented so far —
-# other types are skipped (content_score stays null) until their scorers exist.
+# One scorer per task family. document_organization has no scorer yet —
+# that type is skipped (content_score stays null) until it exists.
 SCORERS = {
     TaskType.data_validation: score_validation_submission,
+    TaskType.image_matching: score_matching_submission,
 }
 
 router = APIRouter()
@@ -166,7 +168,11 @@ def submit_task(
         raise HTTPException(status_code=400, detail="Task already completed")
 
     now = datetime.utcnow()
-    submission_data = {"flagged_ids": payload.flagged_ids, "assignments": payload.assignments}
+    submission_data = {
+        "flagged_ids": payload.flagged_ids,
+        "assignments": payload.assignments,
+        "matches": payload.matches,
+    }
     task.submission_data = submission_data
 
     scorer = SCORERS.get(task.type)

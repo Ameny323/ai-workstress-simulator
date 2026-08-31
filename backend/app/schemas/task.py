@@ -49,3 +49,5 @@ class TaskSubmissionRequest(BaseModel):
     flagged_ids: List[int] = []
     # document_organization: record id -> category the user assigned it to.
     assignments: Dict[int, str] = {}
+    # image_matching: image item id -> description id the user matched it to.
+    matches: Dict[int, int] = {}
