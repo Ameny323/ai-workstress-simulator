@@ -19,6 +19,7 @@ class TaskType(str, enum.Enum):
     document_organization = "document_organization"
     email_writing = "email_writing"
     urgent_request = "urgent_request"
+    image_matching = "image_matching"
 
 
 class TaskStatus(str, enum.Enum):
