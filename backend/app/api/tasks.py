@@ -166,7 +166,7 @@ def submit_task(
         raise HTTPException(status_code=400, detail="Task already completed")
 
     now = datetime.utcnow()
-    submission_data = {"flagged_ids": payload.flagged_ids}
+    submission_data = {"flagged_ids": payload.flagged_ids, "assignments": payload.assignments}
     task.submission_data = submission_data
 
     scorer = SCORERS.get(task.type)

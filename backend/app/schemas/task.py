@@ -45,5 +45,7 @@ class TaskCompleteRequest(BaseModel):
 
 
 class TaskSubmissionRequest(BaseModel):
-    # ids of the records the user checked as invalid.
+    # data_validation: ids of the records the user checked as invalid.
     flagged_ids: List[int] = []
+    # document_organization: record id -> category the user assigned it to.
+    assignments: Dict[int, str] = {}
