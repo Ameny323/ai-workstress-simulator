@@ -12,9 +12,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 from openai import OpenAI
+from sqlalchemy.orm import Session as DBSession
 
 from app.core.config import OPENAI_API_KEY
 from app.models.enums import ManagerTone
+from app.models.manager_message import ManagerMessage
 from app.models.session import Session as SessionModel
 from app.models.task import Task
 from app.orchestrators.performance_tracker import PerformanceSnapshot
@@ -154,3 +156,40 @@ def generate_manager_message(
         # visible server-side.
         logger.warning("ARIA message generation failed for event '%s': %s", event_type, exc)
         return ManagerMessageResult(content=_fallback_message(tone), tone=tone, was_fallback=True)
+
+
+def record_manager_message(
+    db: DBSession,
+    event_type: str,
+    session: SessionModel,
+    snapshot: PerformanceSnapshot,
+    task: Optional[Task] = None,
+) -> ManagerMessage:
+    """Generate (or fall back) and persist one ManagerMessage row.
+
+    Thin DB-aware wrapper around generate_manager_message, same split as
+    resolve_difficulty_pool (pure) vs resolve_difficulty_pool_with_cooldown
+    (DB-aware) in task_engine.py.
+    """
+    result = generate_manager_message(event_type, session, snapshot, task)
+
+    trigger_context = {
+        "event_type": event_type,
+        "avg_score": snapshot.avg_score,
+        "consecutive_errors": snapshot.consecutive_errors,
+        "declared_stress": snapshot.declared_stress,
+    }
+    if task is not None:
+        trigger_context["task_id"] = str(task.id)
+
+    message = ManagerMessage(
+        session_id=session.id,
+        content=result.content,
+        tone=result.tone,
+        trigger_context=trigger_context,
+        was_fallback=result.was_fallback,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return message
