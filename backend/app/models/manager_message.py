@@ -19,5 +19,9 @@ class ManagerMessage(Base):
     sent_at = Column(DateTime, default=datetime.utcnow)
     trigger_context = Column(JSON, nullable=True)
     is_read = Column(Boolean, default=False)
+    # True when this message came from the hardcoded fallback templates
+    # (OpenAI call failed, timed out, or no key configured) rather than a
+    # real model response.
+    was_fallback = Column(Boolean, default=False)
 
     session = relationship("Session", back_populates="manager_messages")
