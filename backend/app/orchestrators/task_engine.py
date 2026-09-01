@@ -21,6 +21,7 @@ from app.orchestrators.adaptation import adjust_priority_and_deadline, resolve_d
 from app.orchestrators.performance_tracker import get_performance_snapshot
 from app.tasks.data_validation import generate_validation_instance
 from app.tasks.document_organization import generate_document_organization_instance
+from app.tasks.image_matching import generate_matching_instance
 
 # Fewer than this many completed tasks since the pool last actually changed
 # means the cooldown is still active — reuse the previous pool instead of
@@ -33,6 +34,7 @@ DIFFICULTY_COOLDOWN_TASKS = 2
 INSTANCE_GENERATORS = {
     TaskType.data_validation: generate_validation_instance,
     TaskType.document_organization: generate_document_organization_instance,
+    TaskType.image_matching: generate_matching_instance,
 }
 
 
