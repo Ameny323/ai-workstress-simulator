@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
@@ -13,6 +13,8 @@ from app.models.task import Task
 from app.models.enums import TaskStatus, TaskType
 from app.schemas.task import TaskCreate, TaskOut, TaskCompleteRequest, TaskSubmissionRequest
 from app.orchestrators.task_engine import TaskEngine, NoTemplateAvailable
+from app.orchestrators.performance_tracker import PerformanceSnapshot
+from app.ai.manager_service import record_manager_message_job
 from app.tasks.data_validation import score_validation_submission
 from app.tasks.image_matching import score_matching_submission
 
@@ -105,14 +107,30 @@ def list_tasks(
 )
 def get_next_task(
     session_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     session = get_owned_session(session_id, db, current_user)
 
+    # Schedules ARIA message generation to run AFTER this response is sent,
+    # rather than blocking on it -- the OpenAI call (or its fallback path)
+    # must never add latency to task generation. Captures session_id (not
+    # the ORM `session`/`task` objects, which will be detached once this
+    # request's db session closes) -- record_manager_message_job re-fetches
+    # fresh copies from its own session.
+    def on_manager_event(event_type: str, snapshot: PerformanceSnapshot, task: Optional[Task]):
+        background_tasks.add_task(
+            record_manager_message_job,
+            session_id=session_id,
+            event_type=event_type,
+            snapshot=snapshot,
+            task_id=task.id if task is not None else None,
+        )
+
     engine = TaskEngine(db)
     try:
-        task = engine.generate_next_task(session_id, session.current_phase)
+        task = engine.generate_next_task(session_id, session.current_phase, on_manager_event=on_manager_event)
     except NoTemplateAvailable as e:
         raise HTTPException(status_code=404, detail=str(e))
 

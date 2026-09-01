@@ -9,7 +9,7 @@ selection, adaptation, and persistence.
 """
 import random
 import uuid
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from sqlalchemy.orm import Session as DBSession
 
@@ -18,10 +18,18 @@ from app.models.session import Session as SessionModel
 from app.models.task import Task
 from app.models.task_template import TaskTemplate
 from app.orchestrators.adaptation import adjust_priority_and_deadline, resolve_difficulty_pool
-from app.orchestrators.performance_tracker import get_performance_snapshot
+from app.orchestrators.performance_tracker import PerformanceSnapshot, get_performance_snapshot
 from app.tasks.data_validation import generate_validation_instance
 from app.tasks.document_organization import generate_document_organization_instance
 from app.tasks.image_matching import generate_matching_instance
+
+# Fired for ARIA manager-message triggers. Deliberately a plain callable,
+# not a FastAPI type -- this module stays framework-agnostic, and whatever
+# calls generate_next_task decides how to actually run it (e.g. the API
+# layer schedules it via BackgroundTasks so it can't block the response).
+# Default is None everywhere, so every existing caller (including the
+# verification scripts) is completely unaffected.
+ManagerEventCallback = Callable[[str, PerformanceSnapshot, Optional[Task]], None]
 
 # Fewer than this many completed tasks since the pool last actually changed
 # means the cooldown is still active — reuse the previous pool instead of
@@ -53,7 +61,10 @@ def _deserialize_pool(raw) -> Optional[List[TaskDifficulty]]:
 
 
 def resolve_difficulty_pool_with_cooldown(
-    db: DBSession, session: SessionModel, phase: SessionPhase
+    db: DBSession,
+    session: SessionModel,
+    phase: SessionPhase,
+    on_manager_event: Optional[ManagerEventCallback] = None,
 ) -> List[TaskDifficulty]:
     """Wraps adaptation.resolve_difficulty_pool with a cooldown so the pool
     doesn't flip on every single completion in a row.
@@ -65,6 +76,17 @@ def resolve_difficulty_pool_with_cooldown(
 
     The mercy rule always overrides the cooldown: it exists specifically to
     react immediately to a struggling user, so it must never be delayed.
+
+    on_manager_event, if given, fires:
+      - "mercy_rule_activated" every call where the mercy rule is what's
+        governing the pool right now (not gated by cooldown -- same as the
+        pool resolution itself, which mercy always overrides).
+      - "difficulty_changed" only on a genuine escalation/de-escalation
+        change (the same `candidate_pool != previous_pool` check that
+        decides whether to persist a new anchor below) -- and only when
+        that change ISN'T the mercy rule, since mercy gets its own event
+        instead. resolve_difficulty_pool is first-match-wins, so these two
+        are mutually exclusive per call by construction.
     """
     snapshot = get_performance_snapshot(db, session.id)
     candidate_pool = resolve_difficulty_pool(snapshot, phase)
@@ -74,6 +96,9 @@ def resolve_difficulty_pool_with_cooldown(
         and snapshot.declared_stress > 80
         and snapshot.avg_score < 40
     )
+
+    if is_mercy and on_manager_event is not None:
+        on_manager_event("mercy_rule_activated", snapshot, None)
 
     previous_pool = _deserialize_pool(session.last_difficulty_pool)
 
@@ -85,10 +110,18 @@ def resolve_difficulty_pool_with_cooldown(
             return previous_pool  # cooldown active — ignore what the rules say now
 
     if candidate_pool != previous_pool:
+        # previous_pool is None on a session's very first-ever resolution --
+        # that's initialization, not a change to announce. Firing here would
+        # be spurious noise: neither escalation nor de-escalation condition
+        # can be true yet on zero history, so _resolve_tone would fall
+        # through to neutre anyway, indistinguishable from new_task_assigned.
+        is_first_ever_resolution = previous_pool is None
         session.last_difficulty_pool = _serialize_pool(candidate_pool)
         session.difficulty_pool_set_at_task_count = snapshot.tasks_completed_in_session
         db.add(session)
         db.commit()
+        if not is_mercy and not is_first_ever_resolution and on_manager_event is not None:
+            on_manager_event("difficulty_changed", snapshot, None)
 
     return candidate_pool
 
@@ -97,7 +130,12 @@ class TaskEngine:
     def __init__(self, db: DBSession):
         self.db = db
 
-    def generate_next_task(self, session_id: uuid.UUID, phase: SessionPhase) -> Task:
+    def generate_next_task(
+        self,
+        session_id: uuid.UUID,
+        phase: SessionPhase,
+        on_manager_event: Optional[ManagerEventCallback] = None,
+    ) -> Task:
         # debriefing means the session is wrapping up — refuse outright
         # rather than relying on resolve_difficulty_pool's [EASY] fallback
         # to quietly handle a phase it was never meant to serve tasks for.
@@ -108,7 +146,9 @@ class TaskEngine:
         if session is None:
             raise NoTemplateAvailable(f"Session '{session_id}' not found")
 
-        difficulty_pool = resolve_difficulty_pool_with_cooldown(self.db, session, phase)
+        difficulty_pool = resolve_difficulty_pool_with_cooldown(
+            self.db, session, phase, on_manager_event=on_manager_event
+        )
 
         templates = (
             self.db.query(TaskTemplate)
@@ -166,4 +206,8 @@ class TaskEngine:
         self.db.add(task)
         self.db.commit()
         self.db.refresh(task)
+
+        if on_manager_event is not None:
+            on_manager_event("new_task_assigned", snapshot, task)
+
         return task

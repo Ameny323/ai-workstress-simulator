@@ -8,6 +8,7 @@ malformed response: all of them fall through to the same safe path.
 """
 import logging
 import random
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,6 +16,7 @@ from openai import OpenAI
 from sqlalchemy.orm import Session as DBSession
 
 from app.core.config import OPENAI_API_KEY
+from app.database import SessionLocal
 from app.models.enums import ManagerTone
 from app.models.manager_message import ManagerMessage
 from app.models.session import Session as SessionModel
@@ -193,3 +195,34 @@ def record_manager_message(
     db.commit()
     db.refresh(message)
     return message
+
+
+def record_manager_message_job(
+    session_id: uuid.UUID,
+    event_type: str,
+    snapshot: PerformanceSnapshot,
+    task_id: Optional[uuid.UUID] = None,
+) -> None:
+    """Background-task entry point (FastAPI BackgroundTasks target).
+
+    Runs after the HTTP response has already been sent, so it can't reuse
+    the request's db session (closed by then) or ORM objects from that
+    session (detached). Opens its own fresh session, re-fetches Session/
+    Task by id, and delegates to record_manager_message. PerformanceSnapshot
+    is a plain dataclass, safe to pass across that boundary directly.
+
+    Swallows its own exceptions (logged) -- by the time this runs the
+    response is already gone, so there's nothing to fail loudly to.
+    """
+    db = SessionLocal()
+    try:
+        session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if session is None:
+            logger.warning("record_manager_message_job: session '%s' not found", session_id)
+            return
+        task = db.query(Task).filter(Task.id == task_id).first() if task_id is not None else None
+        record_manager_message(db, event_type, session, snapshot, task)
+    except Exception:
+        logger.exception("record_manager_message_job failed for event '%s'", event_type)
+    finally:
+        db.close()
