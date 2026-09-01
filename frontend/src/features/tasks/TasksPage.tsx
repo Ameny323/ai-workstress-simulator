@@ -1,26 +1,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../../contexts/AppContext";
 import { apiRequest } from "@/api/client";
-import ValidationTask, { type ValidationTaskData } from "../dashboard/components/ValidationTask";
-import DocumentOrganizationTask, {
-  type DocumentOrganizationTaskData,
-} from "./components/DocumentOrganizationTask";
-
-// Fetched shape before we know which task family it is -- instance_data's
-// concrete shape varies by type, so it's narrowed via a cast once `type`
-// is checked below, same way each *TaskData interface documents its own
-// instance_data shape for its own family.
-interface RawTaskData {
-  id: string;
-  type: string;
-  title: string;
-  description: string | null;
-  instance_data: unknown;
-  deadline_seconds: number | null;
-  priority: string;
-  difficulty: string | null;
-  status: string;
-}
+import TaskRenderer, { type RawTaskData } from "./components/TaskRenderer";
 
 export default function TasksPage() {
   const { session } = useApp();
@@ -85,40 +66,8 @@ export default function TasksPage() {
         <div className="glass-card" style={{ padding: "20px 24px", color: "#94a3b8", fontSize: 13.5 }}>
           Loading task...
         </div>
-      ) : task.type === "data_validation" ? (
-        <ValidationTask key={task.id} task={task as unknown as ValidationTaskData} onSubmitted={handleSubmitted} />
-      ) : task.type === "document_organization" ? (
-        <DocumentOrganizationTask
-          key={task.id}
-          task={task as unknown as DocumentOrganizationTaskData}
-          onSubmitted={handleSubmitted}
-        />
       ) : (
-        <div
-          className="glass-card"
-          style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <div style={{ color: "#4B5A6A", fontSize: 13.5 }}>
-            "{task.title}" is a <strong>{task.type}</strong> task — that type doesn't have a UI
-            built yet.
-          </div>
-          <button
-            onClick={handleSubmitted}
-            style={{
-              alignSelf: "flex-start",
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg, #5B84C6, #8D74FF)",
-              color: "white",
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: "pointer",
-            }}
-          >
-            Get a different task
-          </button>
-        </div>
+        <TaskRenderer task={task} onSubmitted={handleSubmitted} />
       )}
     </div>
   );
