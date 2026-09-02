@@ -1,4 +1,6 @@
 import uuid
+from dataclasses import asdict
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,9 +8,13 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
 from app.api.deps import get_current_user
+from app.models.enums import SessionPhase, SessionStatus
 from app.models.user import User
 from app.models.session import Session as SessionModel
 from app.models.stress_declaration import StressDeclaration
+from app.recommendations.engine import generate_recommendations
+from app.reports.aggregation import get_session_report_data
+from app.reports.fatigue import compute_fatigue_score
 from app.schemas.session import SessionOut, StressOut, StressUpdate
 
 router = APIRouter()
@@ -74,3 +80,80 @@ def declare_stress(
     db.refresh(declaration)
 
     return {"stress": declaration.stress_level, "declared_at": declaration.declared_at}
+
+
+@router.post("/{session_id}/end", response_model=SessionOut)
+def end_session(
+    session_id: uuid.UUID,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Marks a session ended: status -> completed, current_phase ->
+    debriefing, ended_at -> now. Nothing else in this codebase writes to
+    any of these three columns, so this is the only place a session can
+    ever leave `in_progress`/`accueil` -- task_engine.generate_next_task
+    already refuses to serve tasks once current_phase is debriefing, and
+    the /report endpoint gates on status == completed, so both existing
+    and new consumers of these fields agree on what "ended" means.
+
+    409, not a silent no-op, on a session that's already ended -- calling
+    /end twice most likely means a client-side bug (e.g. a double-fired
+    button), and it's more useful to surface that than to hide it.
+    """
+    session = get_owned_session(session_id, db, current_user)
+
+    if session.status != SessionStatus.in_progress:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session has already ended",
+        )
+
+    session.status = SessionStatus.completed
+    session.current_phase = SessionPhase.debriefing
+    session.ended_at = datetime.utcnow()
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return session
+
+
+@router.get("/{session_id}/report")
+def get_session_report(
+    session_id: uuid.UUID,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Gated on status == completed, not current_phase == debriefing --
+    status is the field /end sets and never unsets, so it's the more
+    durable of the two signals to check (current_phase could in principle
+    be reused for other transitions later; status completed specifically
+    means "this session is over"). Requested mid-session, the
+    first/second-half split in report_data would just be "the last couple
+    tasks vs everything before" -- not a meaningful trend -- so this
+    blocks the report entirely rather than serving a misleading one.
+
+    409, not 403: this isn't an authorization failure (get_owned_session
+    already handles that, above, with 403/404) -- the requester is
+    entitled to this session's report, it's just not ready yet. 409
+    Conflict matches /end's own guard just above, for the same reason:
+    the request conflicts with the session's current state, not with who's
+    asking.
+    """
+    session = get_owned_session(session_id, db, current_user)
+
+    if session.status != SessionStatus.completed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session has not ended yet; report is not available until the session ends",
+        )
+
+    report_data = get_session_report_data(db, session_id)
+    fatigue_score = compute_fatigue_score(report_data)
+    recommendations = generate_recommendations(report_data, fatigue_score)
+
+    return {
+        "report_data": asdict(report_data),
+        "fatigue_score": fatigue_score,
+        "recommendations": recommendations,
+    }

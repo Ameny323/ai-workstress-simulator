@@ -31,7 +31,7 @@ interface AppContextValue {
   startSimulation: () => Promise<void>;
   pauseSimulation: () => void;
   resumeSimulation: () => void;
-  finishSession: () => void;
+  finishSession: () => Promise<void>;
   completeTask: () => void;
 }
 
@@ -254,7 +254,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const pauseSimulation = () => setSession((s) => ({ ...s, state: "paused" }));
   const resumeSimulation = () => setSession((s) => ({ ...s, state: "running" }));
-  const finishSession = () => setSession((s) => ({ ...s, state: "finished" }));
+  const finishSession = async () => {
+    // No real backend session to end (e.g. startSimulation fell back to a
+    // local mock session because the API was unreachable) -- just flip
+    // local state, there's nothing to sync.
+    if (!session.id) {
+      setSession((s) => ({ ...s, state: "finished" }));
+      return;
+    }
+    try {
+      const ended = await apiRequest<{
+        id: string;
+        current_phase: string;
+        status: string;
+      }>(`/sessions/${session.id}/end`, { method: "POST" });
+      setSession((s) => ({
+        ...s,
+        phase: toFrontendPhase(ended.current_phase),
+        state: toFrontendState(ended.status),
+      }));
+    } catch (error) {
+      // Already ended (409) or unreachable -- either way the user is
+      // trying to leave the session, so still land them in "finished"
+      // locally rather than leaving the Finish Session button inert.
+      console.error("Could not end session on the backend", error);
+      setSession((s) => ({ ...s, state: "finished" }));
+    }
+  };
   const completeTask = () => {
     setCurrentTask((task) => ({ ...task, progress: 100 }));
     setTimeline((events) => [
