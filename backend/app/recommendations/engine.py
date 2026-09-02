@@ -105,7 +105,24 @@ def generate_recommendations(report: SessionReportData, fatigue_score: int) -> L
     # 0 purely because there's nothing to measure, not because performance
     # was actually good -- caught live, a 0-task session was claiming "a
     # strong, sustainable pace" before this guard existed.
-    if has_enough_data and fatigue_score < GOOD_SESSION_FATIGUE_CEILING and decline < LOW_DECLINE_THRESHOLD:
+    #
+    # Also excludes a low avg_score_overall (same LOW_SCORE_THRESHOLD rule
+    # 4 checks): low fatigue/decline only means "consistent," not "good" --
+    # someone scoring 30/100 all session is consistent too, and calling
+    # that "a strong, sustainable pace" reads as contradictory praise
+    # sitting next to rule 4's task-difficulty-mismatch message. Caught
+    # live in the "consistently low, no decline" test scenario, where both
+    # rules co-fired with genuinely clashing tones. None (no scorer for
+    # this task type yet) is let through unchanged -- there's no score
+    # evidence to contradict, and rule 4 can't have fired either since it
+    # requires avg_score_overall is not None too, so there's no
+    # contradiction risk to guard against in that case.
+    if (
+        has_enough_data
+        and fatigue_score < GOOD_SESSION_FATIGUE_CEILING
+        and decline < LOW_DECLINE_THRESHOLD
+        and (report.avg_score_overall is None or report.avg_score_overall >= LOW_SCORE_THRESHOLD)
+    ):
         recommendations.append(
             "Performance stayed consistent throughout the session with minimal signs of "
             "fatigue. A strong, sustainable pace."
