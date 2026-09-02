@@ -31,7 +31,7 @@ def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
     return max(low, min(high, value))
 
 
-def _performance_decline_score(report: SessionReportData) -> float:
+def performance_decline_score(report: SessionReportData) -> float:
     """Points the average task score dropped from the session's first half
     to its second half. Negative decline (they got better) clamps to 0,
     not a negative contribution. 0 if there isn't enough data for a split
@@ -42,7 +42,7 @@ def _performance_decline_score(report: SessionReportData) -> float:
     return _clamp(report.avg_score_first_half - report.avg_score_second_half)
 
 
-def _slowdown_score(report: SessionReportData) -> float:
+def slowdown_score(report: SessionReportData) -> float:
     """Percentage increase in average time-per-task from first half to
     second half, capped at 100% (a 2x-or-worse slowdown maxes this out).
     0 if there isn't enough data (fewer than 2 tasks -- inherits None from
@@ -56,7 +56,7 @@ def _slowdown_score(report: SessionReportData) -> float:
     return _clamp((second - first) / first * 100)
 
 
-def _error_trend_score(error_count_trend: List[int]) -> float:
+def error_trend_score(error_count_trend: List[int]) -> float:
     """Average position in the session (0 = first task, 100 = last task)
     where errors occurred, weighted by how many errors happened at each
     task -- so 5 errors on the last task pulls this higher than 1 error
@@ -79,7 +79,7 @@ def _error_trend_score(error_count_trend: List[int]) -> float:
     return _clamp((weighted_position / total_errors) * 100)
 
 
-def _declared_stress_score(report: SessionReportData) -> float:
+def declared_stress_score(report: SessionReportData) -> float:
     """The highest stress level self-reported at any point in the session
     (peak, not latest) -- a fatigue report should capture how bad it got,
     not just how they felt in the final moment, which could understate
@@ -98,15 +98,21 @@ def _declared_stress_score(report: SessionReportData) -> float:
 
 
 def compute_fatigue_score(report: SessionReportData) -> int:
-    performance_decline_score = _performance_decline_score(report)
-    slowdown_score = _slowdown_score(report)
-    error_trend_score = _error_trend_score(report.error_count_trend)
-    declared_stress_score = _declared_stress_score(report)
+    """The blended headline number. app/recommendations/engine.py calls the
+    four component functions above directly (not this), so recommendations
+    can cite the specific signal that justifies each one rather than just
+    "the fatigue score was high" -- both paths use the exact same component
+    functions, so there's no risk of the two drifting out of sync.
+    """
+    decline = performance_decline_score(report)
+    slowdown = slowdown_score(report)
+    error_trend = error_trend_score(report.error_count_trend)
+    stress = declared_stress_score(report)
 
     fatigue_score = (
-        WEIGHT_PERFORMANCE_DECLINE * performance_decline_score
-        + WEIGHT_SLOWDOWN * slowdown_score
-        + WEIGHT_ERROR_TREND * error_trend_score
-        + WEIGHT_DECLARED_STRESS * declared_stress_score
+        WEIGHT_PERFORMANCE_DECLINE * decline
+        + WEIGHT_SLOWDOWN * slowdown
+        + WEIGHT_ERROR_TREND * error_trend
+        + WEIGHT_DECLARED_STRESS * stress
     )
     return round(_clamp(fatigue_score))
