@@ -9,12 +9,16 @@ from sqlalchemy.orm import Session as DBSession
 from app.database import get_db
 from app.api.deps import get_current_user
 from app.models.enums import SessionPhase, SessionStatus
+from app.models.manager_message import ManagerMessage
 from app.models.user import User
 from app.models.session import Session as SessionModel
 from app.models.stress_declaration import StressDeclaration
+from app.orchestrators.performance_tracker import get_performance_snapshot
 from app.recommendations.engine import generate_recommendations
 from app.reports.aggregation import get_session_report_data
 from app.reports.fatigue import compute_fatigue_score
+from app.schemas.manager_message import ManagerMessageOut
+from app.schemas.performance_snapshot import PerformanceSnapshotOut
 from app.schemas.session import SessionOut, StressOut, StressUpdate
 
 router = APIRouter()
@@ -157,3 +161,47 @@ def get_session_report(
         "fatigue_score": fatigue_score,
         "recommendations": recommendations,
     }
+
+
+@router.get("/{session_id}/manager-messages", response_model=List[ManagerMessageOut])
+def list_manager_messages(
+    session_id: uuid.UUID,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read-only: returns ARIA's persisted messages for this session. Pure
+    read of what app/ai/manager_service.py already writes -- no new
+    business logic, no scoring. Ordered oldest-first, matching how a
+    conversation log reads.
+
+    Note for callers: GET /sessions/{id}/next-task schedules message
+    generation as a BackgroundTasks job that runs *after* that request's
+    response is sent, so a message triggered by a given task-fetch is not
+    guaranteed to be here yet immediately afterward -- poll or delay-refetch
+    rather than assuming synchronicity.
+    """
+    get_owned_session(session_id, db, current_user)
+
+    return (
+        db.query(ManagerMessage)
+        .filter(ManagerMessage.session_id == session_id)
+        .order_by(ManagerMessage.sent_at.asc())
+        .all()
+    )
+
+
+@router.get("/{session_id}/performance-snapshot", response_model=PerformanceSnapshotOut)
+def get_session_performance_snapshot(
+    session_id: uuid.UUID,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read-only: serializes the same PerformanceSnapshot the adaptive
+    difficulty engine and ARIA's own prompt-building already compute
+    internally (app/orchestrators/performance_tracker.py) -- calls the
+    existing function, doesn't reimplement it.
+    """
+    get_owned_session(session_id, db, current_user)
+
+    snapshot = get_performance_snapshot(db, session_id, window_size=4)
+    return PerformanceSnapshotOut(**asdict(snapshot))
