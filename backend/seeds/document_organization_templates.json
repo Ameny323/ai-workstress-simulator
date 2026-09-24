@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Sort the Shared Drive Uploads",
+    "description": "A pile of files landed in the shared drive's inbox folder overnight with no structure. Route each one to the folder it actually belongs in.",
+    "task_type": "document_organization",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 240,
+    "default_priority": "low",
+    "instructions": "Pick the correct category for each document from the dropdown.",
+    "metadata": {
+      "item_count": 6,
+      "categories": ["Finance", "HR", "Legal"],
+      "document_pool": {
+        "Finance": ["invoice_q3.pdf", "budget_2026.xlsx", "expense_report.pdf", "purchase_order.pdf", "vendor_statement.pdf"],
+        "HR": ["offer_letter.pdf", "employee_handbook.pdf", "leave_request.pdf", "performance_review.pdf", "onboarding_checklist.pdf"],
+        "Legal": ["nda_template.pdf", "vendor_contract.pdf", "compliance_policy.pdf", "terms_of_service.pdf", "data_processing_agreement.pdf"]
+      }
+    },
+    "is_active": true
+  },
+  {
+    "title": "Organize the New Hire Paperwork Drop",
+    "description": "Onboarding paperwork for this week's new hires just got dumped into one folder. Sort each file into the department it belongs to before HR notices.",
+    "task_type": "document_organization",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 300,
+    "default_priority": "low",
+    "instructions": "Pick the correct category for each document from the dropdown.",
+    "metadata": {
+      "item_count": 6,
+      "categories": ["Payroll", "IT", "Facilities"],
+      "document_pool": {
+        "Payroll": ["direct_deposit_form.pdf", "tax_withholding_form.pdf", "salary_letter.pdf", "benefits_enrollment.pdf"],
+        "IT": ["equipment_request.pdf", "vpn_setup_guide.pdf", "software_license_form.pdf", "password_policy.pdf"],
+        "Facilities": ["parking_permit_application.pdf", "badge_request_form.pdf", "desk_assignment.pdf", "building_access_form.pdf"]
+      }
+    },
+    "is_active": true
+  },
+  {
+    "title": "Clear the Marketing Asset Backlog",
+    "description": "The marketing shared folder is a mess of half-labeled files. Sort the backlog into the right buckets so the team can find things again.",
+    "task_type": "document_organization",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 360,
+    "default_priority": "medium",
+    "instructions": "Pick the correct category for each document from the dropdown.",
+    "metadata": {
+      "item_count": 8,
+      "categories": ["Design", "Campaigns", "Analytics"],
+      "document_pool": {
+        "Design": ["logo_variations.zip", "brand_guidelines.pdf", "banner_ad_v2.psd", "icon_set.svg"],
+        "Campaigns": ["email_campaign_brief.pdf", "social_calendar_q3.xlsx", "press_release_draft.docx", "launch_plan.pdf"],
+        "Analytics": ["conversion_report.pdf", "traffic_summary.csv", "ab_test_results.pdf", "funnel_analysis.xlsx"]
+      }
+    },
+    "is_active": true
+  }
+]

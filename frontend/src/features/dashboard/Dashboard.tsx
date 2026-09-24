@@ -119,6 +119,7 @@ function QuickActionsBar() {
 }
 
 export default function Dashboard() {
+  const { session } = useApp();
   return (
     <div
       className="fade-in"
@@ -153,7 +154,7 @@ export default function Dashboard() {
           alignItems: "start",
         }}
       >
-        <StressWidget />
+        <StressWidget sessionId={session.id} disabled={session.state !== "running"} />
         <PerformanceOverview />
         <Timeline />
       </div>

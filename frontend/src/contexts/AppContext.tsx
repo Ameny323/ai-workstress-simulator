@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../api/client";
+import { apiRequest, getToken } from "../api/client";
+import { getMe } from "../features/auth/authApi";
 import type {
   User,
   Session,
@@ -17,6 +18,8 @@ import type {
 
 interface AppContextValue {
   user: User;
+  isAuthenticated: boolean;
+  authChecked: boolean;
   session: Session;
   currentTask: Task;
   messages: ChatMessage[];
@@ -29,6 +32,9 @@ interface AppContextValue {
   activeNav: NavSection;
   setActiveNav: (nav: NavSection) => void;
   startSimulation: () => Promise<void>;
+  ensureSession: () => Promise<string | null>;
+  resumeSession: (session: { id: string; started_at: string; current_phase: string; status: string }) => void;
+  abandonSession: () => Promise<void>;
   pauseSimulation: () => void;
   resumeSimulation: () => void;
   finishSession: () => Promise<void>;
@@ -37,6 +43,9 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// Placeholder shown only before a real user is loaded (or when logged
+// out) -- pages gate its visibility on `isAuthenticated`, so this never
+// renders as if it were a real logged-in identity.
 const MOCK_USER: User = {
   id: "u_01",
   name: "Alex Morgan",
@@ -99,7 +108,34 @@ function toFrontendState(status?: string): SimulationState {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const [user, setUser] = useState<User>(MOCK_USER);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // False until the initial GET /auth/me (or the decision to skip it,
+  // when there's no token at all) has resolved -- lets route guards
+  // distinguish "confirmed logged out" from "haven't checked yet," so a
+  // logged-in user refreshing a protected page isn't bounced to /login
+  // during the brief async window before isAuthenticated flips true.
+  const [authChecked, setAuthChecked] = useState(false);
   const [session, setSession] = useState<Session>(EMPTY_SESSION);
+  // Bug fix: ensureSession/abandonSession/finishSession below must see the
+  // LATEST session, not whatever it was when a caller's own reference to
+  // one of these functions happened to be created. CockpitPage's
+  // loadCurrentTask (and other consumers) deliberately memoize with an
+  // empty useCallback dependency array so the mount effect runs exactly
+  // once -- but that also freezes whichever `ensureSession` instance was
+  // captured at that moment, permanently closing over `session` as it was
+  // on CockpitPage's very first render (EMPTY_SESSION). Every subsequent
+  // call through that frozen reference therefore always saw session.id =
+  // "" and created a brand-new session instead of reusing the real one --
+  // silently discarding all sequence progress on every "Continue to Next
+  // Task" click. A ref is mutable and always reflects the latest value at
+  // CALL time regardless of which stale function reference invokes it,
+  // so reading through sessionRef.current (instead of the `session`
+  // closure variable directly) fixes every current and future caller at
+  // the source, without requiring every consumer's dependency array to be
+  // correct.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
   const [currentTask, setCurrentTask] = useState<Task>(EMPTY_TASK);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -130,7 +166,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(cycle);
   }, []);
 
+  // Real: fetches the actual logged-in user via GET /auth/me. Runs once on
+  // mount if a token already exists (so a page refresh after login doesn't
+  // fall back to looking logged-out), and again right after login inside
+  // startSimulation below.
+  const refreshUser = async () => {
+    try {
+      const me = await getMe();
+      setUser({ id: me.id, name: me.full_name, email: me.email, role: "", createdAt: me.created_at });
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error("Could not load the current user", error);
+      setIsAuthenticated(false);
+    } finally {
+      setAuthChecked(true);
+    }
+  };
+
+  useEffect(() => {
+    if (getToken()) {
+      void refreshUser();
+    } else {
+      // Nothing to check -- already a confirmed "logged out."
+      setAuthChecked(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Real, minimal session lifecycle for pages that just need a session id
+  // to fetch/submit real tasks against -- unlike startSimulation below,
+  // this doesn't seed a fake dashboard task or any of AppContext's mock
+  // messages/metrics/timeline state, and it doesn't navigate anywhere.
+  // Reuses an already-running session instead of creating a new one every
+  // time a page mounts. Returns null (rather than throwing) on failure so
+  // callers can show their own inline error state.
+  const ensureSession = async (): Promise<string | null> => {
+    if (sessionRef.current.id && sessionRef.current.state !== "idle") return sessionRef.current.id;
+    try {
+      const createdSession = await apiRequest<{
+        id: string;
+        started_at: string;
+        current_phase: string;
+        status: string;
+      }>("/sessions/", { method: "POST" });
+      setSession({
+        id: createdSession.id,
+        phase: toFrontendPhase(createdSession.current_phase),
+        elapsedTime: 0,
+        remainingTime: 60 * 60 * 3,
+        state: toFrontendState(createdSession.status),
+        startedAt: new Date(createdSession.started_at),
+      });
+      return createdSession.id;
+    } catch (error) {
+      console.error("Could not start a session", error);
+      return null;
+    }
+  };
+
+  // Real: lets the simulation-history page hand back an in-progress
+  // session it already fetched (GET /sessions/) without re-POSTing a new
+  // one. Sets local session state directly from that data, then navigates
+  // to /tasks -- once there, CockpitPage's loadCurrentTask calls
+  // ensureSession(), which (via sessionRef, see above) sees this id/state
+  // already set and reuses it instead of creating a new session, so
+  // GET /sessions/{id}/next-task resumes exactly where task_sequence_
+  // position left off.
+  const resumeSession = (target: { id: string; started_at: string; current_phase: string; status: string }) => {
+    setSession({
+      id: target.id,
+      phase: toFrontendPhase(target.current_phase),
+      elapsedTime: 0,
+      remainingTime: 60 * 60 * 3,
+      state: toFrontendState(target.status),
+      startedAt: new Date(target.started_at),
+    });
+    navigate("/tasks");
+  };
+
+  // Real: calls POST /sessions/{id}/abandon (marks status -> abandoned,
+  // doesn't delete anything) and resets local session state back to idle.
+  // Used when the user explicitly chooses not to keep an in-progress
+  // session for later -- e.g. the cockpit's "leave without finishing"
+  // exit prompt's "Delete" option. A no-op if there's no running session.
+  const abandonSession = async () => {
+    if (!sessionRef.current.id || sessionRef.current.state === "idle") return;
+    try {
+      await apiRequest(`/sessions/${sessionRef.current.id}/abandon`, { method: "POST" });
+    } catch (error) {
+      console.error("Could not abandon the session", error);
+    } finally {
+      setSession(EMPTY_SESSION);
+    }
+  };
+
   const startSimulation = async () => {
+    await refreshUser();
     try {
       const createdSession = await apiRequest<{
         id: string;
@@ -257,17 +388,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const finishSession = async () => {
     // No real backend session to end (e.g. startSimulation fell back to a
     // local mock session because the API was unreachable) -- just flip
-    // local state, there's nothing to sync.
-    if (!session.id) {
+    // local state, there's nowhere real to navigate to.
+    if (!sessionRef.current.id) {
       setSession((s) => ({ ...s, state: "finished" }));
       return;
     }
+    const realSessionId = sessionRef.current.id;
     try {
       const ended = await apiRequest<{
         id: string;
         current_phase: string;
         status: string;
-      }>(`/sessions/${session.id}/end`, { method: "POST" });
+      }>(`/sessions/${realSessionId}/end`, { method: "POST" });
       setSession((s) => ({
         ...s,
         phase: toFrontendPhase(ended.current_phase),
@@ -275,11 +407,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
     } catch (error) {
       // Already ended (409) or unreachable -- either way the user is
-      // trying to leave the session, so still land them in "finished"
-      // locally rather than leaving the Finish Session button inert.
+      // trying to leave the session. A 409 specifically means the report
+      // genuinely exists (something already ended it), so still navigate
+      // below rather than stranding them on the dashboard.
       console.error("Could not end session on the backend", error);
       setSession((s) => ({ ...s, state: "finished" }));
     }
+    navigate(`/sessions/${realSessionId}/report`);
   };
   const completeTask = () => {
     setCurrentTask((task) => ({ ...task, progress: 100 }));
@@ -295,7 +429,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]);
   };
   const value: AppContextValue = {
-    user: MOCK_USER,
+    user,
+    isAuthenticated,
+    authChecked,
     session,
     currentTask,
     messages,
@@ -308,6 +444,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activeNav,
     setActiveNav,
     startSimulation,
+    ensureSession,
+    resumeSession,
+    abandonSession,
     pauseSimulation,
     resumeSimulation,
     finishSession,

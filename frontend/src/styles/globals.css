@@ -1,7 +1,7 @@
 /* src/styles/globals.css
    Shared styling for the WorkPulse dashboard shell and panels. */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -100,6 +100,17 @@
     user-select: none;
   }
 
+  /* Promoted from Sidebar.tsx's inline "Workspace" section-label style so
+     WorkspaceSidebar can share it instead of re-typing the same literal. */
+  .nav-section-label {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0 12px 8px;
+  }
+
   .nav-item:hover {
     background: var(--sidebar-hover);
     color: var(--sidebar-foreground);
@@ -140,4 +151,66 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Used by CockpitPage's status dots (session-active indicator, ARIA
+   "monitoring" dot) -- ported from the same mockup that introduced them. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Landing page ("front office") ──────────────────────────────────────
+   Ported from the delivered design as-is -- distinct keyframe/class names
+   from the dashboard's own .fade-in/fadeIn above, so nothing here collides
+   with or replaces the existing animation vocabulary; this is purely
+   additive for the one page that uses it. Not folded into
+   src/lib/motion.ts's tokens -- that system is scoped to the task-taking
+   cockpit's reactive feedback (pulses/counters/deadlines), a different
+   concern from this page's scroll-driven marketing reveal, which already
+   arrives as a complete, internally-consistent system of its own. */
+.font-serif { font-family: "DM Serif Display", Georgia, serif; }
+.font-mono { font-family: "JetBrains Mono", monospace; }
+
+@keyframes pulse-draw {
+  0% { stroke-dashoffset: 800; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes data-float {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-draw {
+  stroke-dasharray: 800;
+  stroke-dashoffset: 800;
+  animation: pulse-draw 3s ease-out forwards;
+}
+
+.animate-breathe { animation: breathe 4s ease-in-out infinite; }
+.animate-data-float { animation: data-float 6s ease-in-out infinite; }
+
+/* Section fade-in on scroll (IntersectionObserver-driven, see
+   LandingPage.tsx's useSectionReveal) */
+.section-reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+.section-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stress declaration control (StressWidget.tsx) -- explicit visible focus
+   state for keyboard navigation, on-brand rather than the browser default. */
+.stress-level-button:focus-visible {
+  outline: 2px solid #587A92;
+  outline-offset: 2px;
 }

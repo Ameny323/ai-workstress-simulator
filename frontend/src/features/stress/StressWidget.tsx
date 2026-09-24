@@ -1,163 +1,171 @@
 import { useState } from "react";
-import { useApp } from "../../contexts/AppContext";
-import { apiRequest } from "@/api/client";
+import { apiRequest, ApiError } from "@/api/client";
 
-interface StressBand {
-  min: number;
-  max: number;
-  label: string;
-  color: string;
+// Self-reported, observational simulation signal -- 1 (Calm) to 5
+// (Extreme). Never a medical/psychological assessment: no diagnostic
+// language, no immediate interpretation, no alarming copy. Matches the
+// backend's StressDeclarationCreate/Out (app/schemas/session.py) exactly.
+export interface StressDeclarationRequest {
+  stress_level: number;
 }
 
-const BANDS: StressBand[] = [
-  { min: 0, max: 20, label: "Very Low", color: "#22c55e" },
-  { min: 21, max: 40, label: "Low", color: "#86efac" },
-  { min: 41, max: 60, label: "Moderate", color: "#f59e0b" },
-  { min: 61, max: 80, label: "High", color: "#f97316" },
-  { min: 81, max: 100, label: "Very High", color: "#ef4444" },
+export interface StressDeclarationResponse {
+  id: string;
+  session_id: string;
+  task_id: string | null;
+  stress_level: number;
+  declared_at: string;
+  elapsed_seconds: number | null;
+  simulation_phase: string | null;
+  aria_state: string | null;
+  previous_stress_level: number | null;
+  stress_change: number | null;
+}
+
+interface StressLevelOption {
+  value: number;
+  label: string;
+}
+
+const LEVELS: StressLevelOption[] = [
+  { value: 1, label: "Calm" },
+  { value: 2, label: "Slightly pressured" },
+  { value: 3, label: "Moderately pressured" },
+  { value: 4, label: "Highly pressured" },
+  { value: 5, label: "Extremely pressured" },
 ];
 
-function bandFor(value: number): StressBand {
-  return BANDS.find((b) => value >= b.min && value <= b.max) ?? BANDS[2];
+// WorkPulse design system colors.
+const COLOR_PRIMARY = "#587A92";
+const COLOR_TEXT = "#243746";
+const COLOR_SECONDARY = "#718493";
+const COLOR_SURFACE = "#FFFFFF";
+const COLOR_DANGER = "#B97878";
+const COLOR_BORDER = "#E3E9EE";
+
+function formatClockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-const GUIDANCE: Record<string, string> = {
-  "Very Low": "You are in an optimal state. Excellent conditions for focused work.",
-  Low: "Light manageable load. You are performing well within your comfort zone.",
-  Moderate: "Moderate stress detected. Monitor your pace and take short breaks as needed.",
-  High: "Elevated stress. Your AI Manager has been notified. Consider a short break.",
-  "Very High": "High stress level. Emergency break recommended. Your AI Manager is intervening.",
-};
+interface StressWidgetProps {
+  sessionId: string;
+  /** True while the session isn't in a state that can accept a declaration
+   * (not yet started, paused, or already ended) -- purely a UI courtesy;
+   * the backend re-validates this independently regardless. */
+  disabled?: boolean;
+}
 
-export default function StressWidget() {
-  const { session } = useApp();
-  const [draftValue, setDraftValue] = useState(50);
-  const [submittedValue, setSubmittedValue] = useState<number | null>(null);
+export default function StressWidget({ sessionId, disabled = false }: StressWidgetProps) {
   const [submitting, setSubmitting] = useState(false);
+  // Set immediately on click (optimistic local feedback, section 16),
+  // then reconciled with the server's confirmed value once it responds --
+  // reverted back to whatever was last actually recorded on failure, so a
+  // rejected declaration never visually looks like it succeeded.
+  const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
+  const [lastRecorded, setLastRecorded] = useState<StressDeclarationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const draftBand = bandFor(draftValue);
-  const trackBg = "linear-gradient(90deg, #22c55e, #86efac 25%, #f59e0b 50%, #f97316 75%, #ef4444)";
+  const isDisabled = disabled || !sessionId;
 
-  const handleReport = async () => {
-    if (!session.id) return;
+  const handleSelect = async (level: number) => {
+    if (isDisabled || submitting) return;
+    setSelectedLevel(level);
     setSubmitting(true);
     setError(null);
     try {
-      const result = await apiRequest<{ stress: number; declared_at: string }>(
-        `/sessions/${session.id}/stress`,
-        { method: "POST", body: JSON.stringify({ stress: draftValue }) }
-      );
-      // Read the confirmed value back from the response rather than
-      // assuming the POST persisted exactly what was sent.
-      setSubmittedValue(result.stress);
+      const result = await apiRequest<StressDeclarationResponse>(`/sessions/${sessionId}/stress`, {
+        method: "POST",
+        body: JSON.stringify({ stress_level: level } satisfies StressDeclarationRequest),
+      });
+      setLastRecorded(result);
+      setSelectedLevel(result.stress_level);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to report stress level");
+      setSelectedLevel(lastRecorded?.stress_level ?? null);
+      if (err instanceof ApiError && err.status === 429) {
+        setError("Your previous stress level was recorded recently. You can update it again later.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        setError("Stress can only be declared while the session is active.");
+      } else {
+        setError("Your stress level could not be recorded. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="glass-card" style={{ padding: "18px 22px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div>
-          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
-            Stress Declaration
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2B3C" }}>How are you feeling?</div>
-        </div>
-        <div
-          style={{
-            padding: "5px 12px",
-            borderRadius: 99,
-            background: `${draftBand.color}18`,
-            border: `1px solid ${draftBand.color}40`,
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 700, color: draftBand.color }}>
-            {draftValue} · {draftBand.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Slider */}
-      <div style={{ marginBottom: 10 }}>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={draftValue}
-          onChange={(e) => setDraftValue(Number(e.target.value))}
-          style={{
-            width: "100%",
-            background: trackBg,
-            cursor: "pointer",
-          }}
-        />
-      </div>
-
-      {/* Band labels */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-        {BANDS.map((b) => (
-          <span
-            key={b.label}
-            style={{
-              fontSize: 10,
-              fontWeight: draftBand.label === b.label ? 700 : 500,
-              color: draftBand.label === b.label ? b.color : "#94a3b8",
-              transition: "color 0.15s",
-            }}
-          >
-            {b.label}
-          </span>
-        ))}
-      </div>
-
-      {/* Guidance text */}
+    <div style={{ padding: "14px 18px", borderTop: "1px solid #F3F6F8" }}>
       <div
         style={{
-          padding: "10px 14px",
-          borderRadius: 8,
-          background: `${draftBand.color}0d`,
-          border: `1px solid ${draftBand.color}25`,
-          fontSize: 12.5,
-          color: "#1A2B3C",
-          lineHeight: 1.45,
-          marginBottom: 14,
+          fontSize: 9,
+          fontWeight: 600,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: COLOR_SECONDARY,
+          marginBottom: 3,
         }}
       >
-        {GUIDANCE[draftBand.label]}
+        Self-reported stress
+      </div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: COLOR_TEXT, marginBottom: 8, lineHeight: 1.4 }}>
+        How are you feeling right now?
       </div>
 
-      {/* Submit + confirmation */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 11.5, color: error ? "#c0505a" : "#94a3b8", flex: 1 }}>
-          {error
-            ? error
-            : submittedValue !== null
-              ? `Reported: ${submittedValue} (${bandFor(submittedValue).label})`
-              : "Not reported yet this session."}
-        </span>
-        <button
-          onClick={() => void handleReport()}
-          disabled={submitting || !session.id}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 8,
-            border: "none",
-            background: "linear-gradient(135deg, #5B84C6, #8D74FF)",
-            color: "white",
-            fontWeight: 700,
-            fontSize: 12,
-            cursor: submitting || !session.id ? "default" : "pointer",
-            opacity: submitting ? 0.7 : 1,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {submitting ? "Reporting..." : "Report Stress Level"}
-        </button>
+      <div
+        role="radiogroup"
+        aria-label="Self-reported stress level, 1 Calm to 5 Extremely pressured"
+        style={{ display: "flex", gap: 4 }}
+      >
+        {LEVELS.map((level) => {
+          const isSelected = selectedLevel === level.value;
+          return (
+            <button
+              key={level.value}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${level.value} - ${level.label}`}
+              title={level.label}
+              disabled={isDisabled || submitting}
+              onClick={() => void handleSelect(level.value)}
+              className="stress-level-button"
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+                padding: "7px 2px",
+                borderRadius: 8,
+                border: `1.5px solid ${isSelected ? COLOR_PRIMARY : COLOR_BORDER}`,
+                background: isSelected ? "rgba(88,122,146,0.10)" : COLOR_SURFACE,
+                cursor: isDisabled || submitting ? "default" : "pointer",
+                opacity: isDisabled ? 0.5 : 1,
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+            >
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: isSelected ? COLOR_PRIMARY : COLOR_TEXT }}>
+                {level.value}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, padding: "0 1px" }}>
+        <span style={{ fontSize: 8.5, color: COLOR_SECONDARY }}>Calm</span>
+        <span style={{ fontSize: 8.5, color: COLOR_SECONDARY }}>Extreme</span>
+      </div>
+
+      <div style={{ marginTop: 9, fontSize: 10.5, lineHeight: 1.5, color: error ? COLOR_DANGER : COLOR_SECONDARY, minHeight: 15 }}>
+        {error ? (
+          error
+        ) : lastRecorded ? (
+          <span>
+            Stress level recorded. <span style={{ color: "#B7C2CB" }}>Recorded at {formatClockTime(lastRecorded.declared_at)}</span>
+          </span>
+        ) : (
+          "Your response helps us analyze how perceived pressure changes during the simulation."
+        )}
       </div>
     </div>
   );

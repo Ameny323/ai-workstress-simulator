@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { NavSection } from "../../types";
 import { useApp } from "../../contexts/AppContext";
 import { clearToken } from "../../api/client";
 
 const NAV_ROUTES: Partial<Record<NavSection, string>> = {
   dashboard: "/bureau",
-  tasks: "/tasks",
+  simulation: "/simulation",
 };
 
 interface NavItem {
@@ -31,15 +31,6 @@ function PlayCircleIcon() {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <circle cx="12" cy="12" r="9" />
       <polygon fill="currentColor" stroke="none" points="10,8 17,12 10,16" />
-    </svg>
-  );
-}
-
-function CheckSquareIcon() {
-  return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <polyline points="9 11 12 14 22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   );
 }
@@ -99,7 +90,6 @@ function LogOutIcon() {
 const PRIMARY_NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutGridIcon /> },
   { id: "simulation", label: "Simulation", icon: <PlayCircleIcon /> },
-  { id: "tasks", label: "Tasks", icon: <CheckSquareIcon /> },
   { id: "manager", label: "AI Manager", icon: <BotIcon /> },
   { id: "analytics", label: "Analytics", icon: <BarChartIcon /> },
   { id: "reports", label: "Reports", icon: <FileTextIcon /> },
@@ -113,6 +103,20 @@ const BOTTOM_NAV: NavItem[] = [
 export default function Sidebar() {
   const { activeNav, setActiveNav } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Highlighting must reflect the CURRENT route, not just the last sidebar
+  // click -- landing on /simulation via a different entry point (the Home
+  // page's own top nav, a direct link, browser back/forward) previously
+  // left "Dashboard" highlighted instead, since activeNav only ever
+  // changed on a sidebar click. For any item with a real route, the URL
+  // is the source of truth; only routeless items (no NAV_ROUTES entry
+  // yet) fall back to the click-tracked activeNav state.
+  const isActive = (id: NavSection): boolean => {
+    const route = NAV_ROUTES[id];
+    if (route) return location.pathname === route;
+    return activeNav === id;
+  };
 
   const handleNavClick = (id: NavSection) => {
     setActiveNav(id);
@@ -184,28 +188,12 @@ export default function Sidebar() {
         {PRIMARY_NAV.map((item) => (
           <button
             key={item.id}
-            className={`nav-item ${activeNav === item.id ? "active" : ""}`}
+            className={`nav-item ${isActive(item.id as NavSection) ? "active" : ""}`}
             onClick={() => handleNavClick(item.id as NavSection)}
             style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}
           >
-            <span style={{ opacity: activeNav === item.id ? 1 : 0.6 }}>{item.icon}</span>
+            <span style={{ opacity: isActive(item.id as NavSection) ? 1 : 0.6 }}>{item.icon}</span>
             <span>{item.label}</span>
-            {item.id === "simulation" && (
-              <span
-                style={{
-                  marginLeft: "auto",
-                  background: "#5B84C6",
-                  color: "white",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  padding: "2px 6px",
-                  borderRadius: 99,
-                  letterSpacing: "0.04em",
-                }}
-              >
-                LIVE
-              </span>
-            )}
           </button>
         ))}
       </nav>

@@ -8,26 +8,22 @@ malformed response: all of them fall through to the same safe path.
 """
 import logging
 import random
-import uuid
 from dataclasses import dataclass
 from typing import Optional
 
-from openai import OpenAI
 from sqlalchemy.orm import Session as DBSession
 
+from app.ai import openai_service, prompt_builder
+from app.ai.openai_service import OpenAIServiceError
+from app.core.aria_config import ARIA_PROMPT_VERSION
 from app.core.config import OPENAI_API_KEY
-from app.database import SessionLocal
 from app.models.enums import ManagerTone
-from app.models.manager_message import ManagerMessage
 from app.models.session import Session as SessionModel
 from app.models.task import Task
-from app.orchestrators.performance_tracker import PerformanceSnapshot
+from app.orchestrators.performance_tracker import ExtendedPerformanceMetrics
+from app.orchestrators.simulation_fsm import FSMResult
 
 logger = logging.getLogger(__name__)
-
-MODEL = "gpt-4o-mini"
-REQUEST_TIMEOUT_SECONDS = 5.0
-MAX_RESPONSE_TOKENS = 80
 
 
 @dataclass
@@ -44,28 +40,18 @@ class ManagerMessageResult:
 #   oversight/check-ins because trust dipped, not "demanding more" -- that
 #   would contradict just having reduced the difficulty.
 # mercy_rule_activated -> bienveillant: the one clear "ease up" case.
-def _resolve_tone(event_type: str, snapshot: PerformanceSnapshot) -> ManagerTone:
+def _resolve_tone(event_type: str, metrics: ExtendedPerformanceMetrics) -> ManagerTone:
     if event_type == "mercy_rule_activated":
         return ManagerTone.bienveillant
     if event_type == "difficulty_changed":
         # Same precedence as resolve_difficulty_pool's rule ordering:
         # consecutive_errors is checked first and wins on conflict.
-        if snapshot.consecutive_errors >= 3:
+        if metrics.consecutive_errors >= 3:
             return ManagerTone.intrusif
-        if snapshot.avg_score > 90:
+        if metrics.avg_score > 90:
             return ManagerTone.exigeant
     return ManagerTone.neutre
 
-
-TONE_DESCRIPTIONS = {
-    ManagerTone.neutre: "professional and matter-of-fact",
-    ManagerTone.exigeant: "impressed but demanding -- raise expectations, push for more",
-    ManagerTone.intrusif: (
-        "tightening oversight -- checking in more closely, slightly hovering, "
-        "because recent performance has dipped"
-    ),
-    ManagerTone.bienveillant: "warm and supportive -- easing pressure, showing care for wellbeing",
-}
 
 # 2-3 hardcoded fallback templates per tone bucket. Content differs by
 # bucket on purpose -- an escalation fallback and a de-escalation fallback
@@ -94,135 +80,116 @@ FALLBACK_MESSAGES = {
 }
 
 
-def _fallback_message(tone: ManagerTone) -> str:
+# Task 02 (Email Prioritization) trigger-specific fallback wording,
+# matching the spec's own example lines more closely than the generic
+# per-tone messages above. Checked first; falls back to the generic
+# FALLBACK_MESSAGES[tone] list for any trigger not listed here. Still just
+# wording -- the tone/trigger themselves are always decided by
+# app/orchestrators/aria_policy.py before this module ever runs.
+EMAIL_TRIGGER_FALLBACK_MESSAGES: dict = {
+    "TASK_STARTED": [
+        "Your session has just started. Analyze each email with the current operational context in mind.",
+    ],
+    "FAST_DECISION": [
+        "Your decision pace is fast. Make sure the priority actually matches the context.",
+    ],
+    "SLOW_DECISION": [
+        "Your decision time is increasing. Keep up the pace.",
+    ],
+    "RECONSIDERATION": [
+        "You changed your decision. This hesitation has been recorded.",
+    ],
+    "MULTIPLE_RECONSIDERATIONS": [
+        "Several decisions have been re-evaluated. Your average decision time is increasing.",
+    ],
+    "LOW_REMAINING_TIME": [
+        "Remaining time is limited. Several emails still need to be prioritized.",
+    ],
+    "SLOW_OVERALL_PROGRESS": [
+        "Your current pace is below the expected target.",
+    ],
+    "HIGH_ACCURACY": [
+        "Your accuracy is high. Keep up this pace.",
+    ],
+    "LOW_ACCURACY": [
+        "Several recent priorities don't match the expected context. Double-check your decisions.",
+    ],
+    "TASK_COMPLETED": [
+        "Task completed. I'm now analyzing your decisions and processing pace.",
+    ],
+}
+
+
+def fallback_message(tone: ManagerTone, trigger: Optional[str] = None, email_context: bool = False) -> str:
+    """Public: both event pipelines (email_event_pipeline.py and the
+    generalized aria_pipeline.py) use this directly to synchronously
+    reserve a ManagerMessage row's placeholder content -- the cooldown
+    check needs a real persisted row the instant a message is decided on,
+    not after the OpenAI call in the background job finishes.
+
+    `email_context` gates EMAIL_TRIGGER_FALLBACK_MESSAGES specifically --
+    aria_policy.py's generalized trigger engine now emits the SAME trigger
+    names (TASK_STARTED, TASK_COMPLETED, ...) for every task family, not
+    just email prioritization, so a trigger-name-only lookup would leak
+    email-specific wording ("Analyze each email...") onto
+    data_validation/image_matching/document_organization tasks. Only
+    email_event_pipeline.py passes email_context=True.
+    """
+    if email_context and trigger and trigger in EMAIL_TRIGGER_FALLBACK_MESSAGES:
+        return random.choice(EMAIL_TRIGGER_FALLBACK_MESSAGES[trigger])
     return random.choice(FALLBACK_MESSAGES[tone])
 
 
-def _build_system_prompt(tone: ManagerTone) -> str:
-    return (
-        "You are ARIA, an AI manager overseeing an employee's workday inside a workplace "
-        "stress simulation. Write ONE short message (1-2 sentences, under 40 words) reacting "
-        f"to what just happened. Tone for this message: {TONE_DESCRIPTIONS[tone]}. "
-        "Stay in character as a workplace manager, not a chatbot assistant. No greetings, "
-        "no sign-offs, no markdown, no quotation marks around the message."
-    )
-
-
-def _build_user_prompt(
-    event_type: str, session: SessionModel, snapshot: PerformanceSnapshot, task: Optional[Task]
-) -> str:
-    lines = [
-        f"Event: {event_type}",
-        f"Session phase: {session.current_phase.value}",
-        f"Average score (recent window): {snapshot.avg_score}",
-        f"Consecutive errors: {snapshot.consecutive_errors}",
-        f"Tasks completed this session: {snapshot.tasks_completed_in_session}",
-    ]
-    if snapshot.declared_stress is not None:
-        lines.append(f"Declared stress: {snapshot.declared_stress}/100")
-    if task is not None:
-        difficulty = task.difficulty.value if task.difficulty else "n/a"
-        lines.append(f"Task: \"{task.title}\" (difficulty={difficulty}, priority={task.priority.value})")
-    return "\n".join(lines)
-
-
-def generate_manager_message(
-    event_type: str,
-    session: SessionModel,
-    snapshot: PerformanceSnapshot,
-    task: Optional[Task] = None,
-) -> ManagerMessageResult:
-    tone = _resolve_tone(event_type, snapshot)
-
-    if not OPENAI_API_KEY:
-        return ManagerMessageResult(content=_fallback_message(tone), tone=tone, was_fallback=True)
-
-    try:
-        client = OpenAI(api_key=OPENAI_API_KEY, timeout=REQUEST_TIMEOUT_SECONDS, max_retries=0)
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": _build_system_prompt(tone)},
-                {"role": "user", "content": _build_user_prompt(event_type, session, snapshot, task)},
-            ],
-            max_tokens=MAX_RESPONSE_TOKENS,
-        )
-        content = (response.choices[0].message.content or "").strip()
-        if not content:
-            raise ValueError("empty response from model")
-        return ManagerMessageResult(content=content, tone=tone, was_fallback=False)
-    except Exception as exc:
-        # Intentionally broad: auth errors, timeouts, rate limits, network
-        # errors, and malformed responses must ALL fall through to the same
-        # safe path. Logged, not silently swallowed, so failures are still
-        # visible server-side.
-        logger.warning("ARIA message generation failed for event '%s': %s", event_type, exc)
-        return ManagerMessageResult(content=_fallback_message(tone), tone=tone, was_fallback=True)
-
-
-def record_manager_message(
+async def generate_manager_message(
     db: DBSession,
     event_type: str,
     session: SessionModel,
-    snapshot: PerformanceSnapshot,
+    metrics: ExtendedPerformanceMetrics,
     task: Optional[Task] = None,
-) -> ManagerMessage:
-    """Generate (or fall back) and persist one ManagerMessage row.
+    tone: Optional[ManagerTone] = None,
+    trigger: Optional[str] = None,
+    extra_facts: Optional[dict] = None,
+    email_context: bool = False,
+    fsm_result: Optional[FSMResult] = None,
+) -> ManagerMessageResult:
+    """`tone`/`trigger` are optional overrides: when the caller has already
+    decided them deterministically (aria_policy.decide_aria_reaction), pass
+    them in and this function skips _resolve_tone entirely -- the LLM (or
+    the fallback template) is only ever asked to phrase an already-made
+    decision, never to make one. `fsm_result` is required to build the full
+    structured prompt (app/ai/prompt_builder.py); both callers
+    (email_event_pipeline.py, aria_pipeline.py) always have one on hand
+    since they just ran simulation_fsm.evaluate_and_persist().
+    `email_context` is forwarded to fallback_message -- see its docstring.
 
-    Thin DB-aware wrapper around generate_manager_message, same split as
-    resolve_difficulty_pool (pure) vs resolve_difficulty_pool_with_cooldown
-    (DB-aware) in task_engine.py.
+    Async because app/ai/openai_service.py uses AsyncOpenAI -- this must be
+    awaited by callers, which run inside FastAPI BackgroundTasks (which
+    awaits async targets natively).
     """
-    result = generate_manager_message(event_type, session, snapshot, task)
+    resolved_tone = tone if tone is not None else _resolve_tone(event_type, metrics)
 
-    trigger_context = {
-        "event_type": event_type,
-        "avg_score": snapshot.avg_score,
-        "consecutive_errors": snapshot.consecutive_errors,
-        "declared_stress": snapshot.declared_stress,
-    }
-    if task is not None:
-        trigger_context["task_id"] = str(task.id)
+    if not OPENAI_API_KEY or fsm_result is None:
+        return ManagerMessageResult(
+            content=fallback_message(resolved_tone, trigger, email_context=email_context),
+            tone=resolved_tone, was_fallback=True,
+        )
 
-    message = ManagerMessage(
-        session_id=session.id,
-        content=result.content,
-        tone=result.tone,
-        trigger_context=trigger_context,
-        was_fallback=result.was_fallback,
-    )
-    db.add(message)
-    db.commit()
-    db.refresh(message)
-    return message
-
-
-def record_manager_message_job(
-    session_id: uuid.UUID,
-    event_type: str,
-    snapshot: PerformanceSnapshot,
-    task_id: Optional[uuid.UUID] = None,
-) -> None:
-    """Background-task entry point (FastAPI BackgroundTasks target).
-
-    Runs after the HTTP response has already been sent, so it can't reuse
-    the request's db session (closed by then) or ORM objects from that
-    session (detached). Opens its own fresh session, re-fetches Session/
-    Task by id, and delegates to record_manager_message. PerformanceSnapshot
-    is a plain dataclass, safe to pass across that boundary directly.
-
-    Swallows its own exceptions (logged) -- by the time this runs the
-    response is already gone, so there's nothing to fail loudly to.
-    """
-    db = SessionLocal()
     try:
-        session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
-        if session is None:
-            logger.warning("record_manager_message_job: session '%s' not found", session_id)
-            return
-        task = db.query(Task).filter(Task.id == task_id).first() if task_id is not None else None
-        record_manager_message(db, event_type, session, snapshot, task)
-    except Exception:
-        logger.exception("record_manager_message_job failed for event '%s'", event_type)
-    finally:
-        db.close()
+        context = prompt_builder.build_context(
+            db, session, fsm_result, metrics, event_type, extra_facts or {},
+            task=task, trigger=trigger, prompt_version=ARIA_PROMPT_VERSION,
+        )
+        content = await openai_service.generate_manager_message(
+            prompt_builder.build_system_prompt(context), prompt_builder.build_user_prompt(context)
+        )
+        return ManagerMessageResult(content=content, tone=resolved_tone, was_fallback=False)
+    except OpenAIServiceError as exc:
+        # Every failure mode (missing key already handled above, timeout,
+        # rate limit, connection error, malformed/invalid JSON) collapses
+        # to this one path. Logged, not silently swallowed, so failures are
+        # still visible server-side.
+        logger.warning("ARIA message generation failed for event '%s': %s", event_type, exc)
+        return ManagerMessageResult(
+            content=fallback_message(resolved_tone, trigger, email_context=email_context),
+            tone=resolved_tone, was_fallback=True,
+        )

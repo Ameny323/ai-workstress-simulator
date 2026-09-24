@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut, Token
 from app.core.security import hash_password, verify_password, create_access_token
@@ -45,3 +46,12 @@ def login(
 
     access_token = create_access_token(data={"sub": str(user.id)})
     return Token(access_token=access_token)
+
+
+@router.get("/me", response_model=UserOut)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Read-only: the authenticated user's own profile, decoded from their
+    bearer token via the same get_current_user dependency every other
+    protected route already uses. No new logic -- just exposes it.
+    """
+    return current_user

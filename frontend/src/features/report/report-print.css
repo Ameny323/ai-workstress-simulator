@@ -1,0 +1,56 @@
+/* Report-scoped responsive + print rules.
+
+   Responsive (screen): the report's two-column charts/metric grids
+   collapse to one column below tablet width so nothing overflows
+   horizontally on a phone (cahier section 16). */
+@media (max-width: 720px) {
+  .report-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Print-optimized layout for the final simulation report -- browser-print
+   approach (cahier section 18): produces real, selectable text and real
+   SVG charts (Recharts renders to SVG, which prints natively), no
+   screenshot/canvas rasterization and no extra PDF library. */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  .report-page {
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .report-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .report-section-card {
+    break-inside: avoid;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 12px 0 !important;
+  }
+
+  .report-header {
+    break-inside: avoid;
+    background: #ffffff !important;
+    color: #243746 !important;
+    border: 1px solid rgba(36, 55, 70, 0.15) !important;
+  }
+
+  .report-header * {
+    color: #243746 !important;
+  }
+
+  @page {
+    margin: 16mm 14mm;
+  }
+}

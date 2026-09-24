@@ -17,7 +17,7 @@ Weights (30/20/20/30) are a defensible starting point, not empirically
 tuned -- that tuning is expected to happen after watching real sessions,
 not pre-emptively here.
 """
-from typing import List, Optional
+from typing import List
 
 from app.reports.aggregation import SessionReportData
 
@@ -85,16 +85,25 @@ def declared_stress_score(report: SessionReportData) -> float:
     not just how they felt in the final moment, which could understate
     things if they'd calmed down by the end. 0 if nothing was declared.
 
-    Trade-off worth being ready to explain: at 30% weight, a single brief
-    stress-slider drag to 100 contributes a flat 30 points regardless of
-    anything else in the session. Deliberate, not a bug -- self-reported
-    peak distress is treated as a strong signal by design, since
-    underreacting to a stated crisis point is worse than overreacting to
-    a possibly-impulsive one.
+    Stress Declaration feature: declared values are 1 (Calm) to 5
+    (Extreme) on a discrete self-report scale, not the old free 0-100
+    slider this formula was originally written against -- normalized here
+    to the 0-100 range this function has always returned (1 -> 0, 5 ->
+    100), so the weighting below and every downstream consumer (this
+    module's own 30% weight, recommendations/engine.py's threshold) needs
+    no further change.
+
+    Trade-off worth being ready to explain: at 30% weight, a single
+    declaration of the top level (5, Extreme) contributes a flat 30 points
+    regardless of anything else in the session. Deliberate, not a bug --
+    self-reported peak distress is treated as a strong signal by design,
+    since underreacting to a stated crisis point is worse than
+    overreacting to a possibly-impulsive one.
     """
     if not report.stress_declarations:
         return 0.0
-    return _clamp(float(max(point.value for point in report.stress_declarations)))
+    peak_level = max(point.value for point in report.stress_declarations)
+    return _clamp((peak_level - 1) / 4 * 100)
 
 
 def compute_fatigue_score(report: SessionReportData) -> int:

@@ -8,6 +8,9 @@ from app.models.stress_declaration import StressDeclaration
 from app.models.performance_indicator import PerformanceIndicator
 from app.models.report import Report
 from app.models.recommendation import Recommendation
+from app.models.email_scenario import EmailScenario
+from app.models.email_task_item import EmailTaskItem
+from app.models.email_decision import EmailDecision
 
 __all__ = [
     "User",
@@ -20,4 +23,7 @@ __all__ = [
     "PerformanceIndicator",
     "Report",
     "Recommendation",
+    "EmailScenario",
+    "EmailTaskItem",
+    "EmailDecision",
 ]

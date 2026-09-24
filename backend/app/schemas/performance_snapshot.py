@@ -2,6 +2,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.models.enums import SessionPhase
+
 
 class PerformanceSnapshotOut(BaseModel):
     avg_score: float
@@ -9,3 +11,4 @@ class PerformanceSnapshotOut(BaseModel):
     declared_stress: Optional[int]
     tasks_completed_in_session: int
     window_size: int
+    current_phase: SessionPhase

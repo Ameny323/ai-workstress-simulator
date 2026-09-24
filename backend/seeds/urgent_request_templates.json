@@ -1,0 +1,53 @@
+[
+  {
+    "title": "Production Outage Alert",
+    "description": "A monitoring alert just came in reporting the production system is down for some customers. Decide how to respond.",
+    "task_type": "urgent_request",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 120,
+    "default_priority": "urgent",
+    "instructions": "Read the incoming request, then choose the single best response action.",
+    "metadata": {
+      "sender": "Monitoring System",
+      "sender_role": "Automated Alert",
+      "subject": "ALERT: Production outage affecting customers",
+      "message": "Our production system has been returning errors for the last 4 minutes. Customer support is already receiving complaints. This is affecting live transactions.",
+      "urgency": 5,
+      "options": [
+        {"id": "escalate", "label": "Immediately escalate to the on-call incident response team"},
+        {"id": "handle_personally", "label": "Try to fix it yourself before telling anyone"},
+        {"id": "delegate", "label": "Forward the alert to a junior teammate and move on"},
+        {"id": "defer", "label": "Wait until the next scheduled check-in to look into it"}
+      ],
+      "correct_action": "escalate"
+    },
+    "is_active": true
+  },
+  {
+    "title": "Executive Asks for an Urgent Number",
+    "description": "A senior executive needs a specific figure before a meeting that starts in 10 minutes. Decide how to respond.",
+    "task_type": "urgent_request",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 120,
+    "default_priority": "high",
+    "instructions": "Read the incoming request, then choose the single best response action.",
+    "metadata": {
+      "sender": "Dana Whitfield",
+      "sender_role": "VP of Operations",
+      "subject": "Need Q3 churn number before my 10am",
+      "message": "I'm walking into a board meeting in 10 minutes and need the exact Q3 customer churn rate. Can you get this to me right now?",
+      "urgency": 4,
+      "options": [
+        {"id": "handle_personally", "label": "Pull the number immediately yourself and reply right away"},
+        {"id": "escalate", "label": "Forward the request up the chain to your own manager"},
+        {"id": "delegate", "label": "Assign it to someone else and check back later"},
+        {"id": "defer", "label": "Reply that you'll get to it after your current task"},
+        {"id": "request_more_info", "label": "Ask her to clarify which churn definition she means before doing anything"}
+      ],
+      "correct_action": "handle_personally"
+    },
+    "is_active": true
+  }
+]

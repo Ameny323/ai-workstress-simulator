@@ -1,0 +1,35 @@
+INFO:     Will watch for changes in these directories: ['D:\\ai-workstress-simulator\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [22872] using StatReload
+INFO:     Started server process [19792]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:61540 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61541 - "POST /sessions/00000000-0000-0000-0000-000000000000/email-prioritization/task HTTP/1.1" 401 Unauthorized
+WARNING:  StatReload detected changes in 'alembic\versions\5d531d7e7924_add_email_prioritization_tables.py'. Reloading...
+ INFO:     127.0.0.1:60273 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60274 - "POST /auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60276 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60277 - "POST /sessions/ HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60278 - "POST /sessions/dc1b7e02-0ee2-4716-a6bc-db7c75c4cd66/email-prioritization/task HTTP/1.1" 200 OK
+ARIA message generation failed for event 'task_started': Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-your-****here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}
+INFO:     127.0.0.1:60281 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53446 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53447 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53448 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53449 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/1ec0867b-7305-45b6-9216-ad7122bcffa6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53450 - "POST /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/1ec0867b-7305-45b6-9216-ad7122bcffa6/decision HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53453 - "POST /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/1ec0867b-7305-45b6-9216-ad7122bcffa6/decision HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:53454 - "PATCH /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/1ec0867b-7305-45b6-9216-ad7122bcffa6/decision HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53455 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64617 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64618 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64619 - "POST /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006/decision HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64620 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64621 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64622 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64623 - "POST /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006/decision HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:64624 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64625 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64626 - "GET /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64627 - "POST /email-prioritization/tasks/58803f9d-7ee0-47c3-8461-d54c9124016d/emails/45461707-da82-406c-853b-574440931006/decision HTTP/1.1" 409 Conflict

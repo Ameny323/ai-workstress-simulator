@@ -13,15 +13,17 @@ from typing import Callable, List, Optional
 
 from sqlalchemy.orm import Session as DBSession
 
-from app.models.enums import SessionPhase, TaskDifficulty, TaskType, TaskStatus
+from app.models.enums import GenerationType, SessionPhase, TaskDifficulty, TaskType, TaskStatus
 from app.models.session import Session as SessionModel
 from app.models.task import Task
 from app.models.task_template import TaskTemplate
 from app.orchestrators.adaptation import adjust_priority_and_deadline, resolve_difficulty_pool
 from app.orchestrators.performance_tracker import PerformanceSnapshot, get_performance_snapshot
 from app.tasks.data_validation import generate_validation_instance
-from app.tasks.document_organization import generate_document_organization_instance
+from app.tasks.document_organization import generate_document_organization_instance_controlled
+from app.tasks.email_writing import generate_email_writing_instance_controlled
 from app.tasks.image_matching import generate_matching_instance
+from app.tasks.urgent_request import generate_urgent_request_instance_controlled
 
 # Fired for ARIA manager-message triggers. Deliberately a plain callable,
 # not a FastAPI type -- this module stays framework-agnostic, and whatever
@@ -36,13 +38,22 @@ ManagerEventCallback = Callable[[str, PerformanceSnapshot, Optional[Task]], None
 # reacting to every single completion.
 DIFFICULTY_COOLDOWN_TASKS = 2
 
-# One instance generator per task family. Add an entry here when a new
-# family (email_writing, urgent_request) gets its own generator module in
-# app/tasks/.
+# One deterministic-only instance generator per task family that has no
+# controlled (LLM-aware) generation path.
 INSTANCE_GENERATORS = {
     TaskType.data_validation: generate_validation_instance,
-    TaskType.document_organization: generate_document_organization_instance,
     TaskType.image_matching: generate_matching_instance,
+}
+
+# Task families with a controlled (LLM-first, deterministic-fallback)
+# generation path -- each function returns (instance_data, generation_type,
+# generation_prompt_version), see e.g. app/tasks/document_organization.py's
+# generate_document_organization_instance_controlled for the exact contract
+# every entry here follows.
+CONTROLLED_INSTANCE_GENERATORS = {
+    TaskType.document_organization: generate_document_organization_instance_controlled,
+    TaskType.email_writing: generate_email_writing_instance_controlled,
+    TaskType.urgent_request: generate_urgent_request_instance_controlled,
 }
 
 
@@ -135,6 +146,7 @@ class TaskEngine:
         session_id: uuid.UUID,
         phase: SessionPhase,
         on_manager_event: Optional[ManagerEventCallback] = None,
+        task_type: Optional[TaskType] = None,
     ) -> Task:
         # debriefing means the session is wrapping up — refuse outright
         # rather than relying on resolve_difficulty_pool's [EASY] fallback
@@ -150,37 +162,72 @@ class TaskEngine:
             self.db, session, phase, on_manager_event=on_manager_event
         )
 
+        type_filter = [TaskTemplate.task_type == task_type] if task_type is not None else []
+
         templates = (
             self.db.query(TaskTemplate)
             .filter(
                 TaskTemplate.phase == phase,
                 TaskTemplate.is_active.is_(True),
                 TaskTemplate.difficulty.in_(difficulty_pool),
+                *type_filter,
             )
             .all()
         )
         if not templates:
             # Difficulty pool has no matching templates yet (e.g. only easy
             # templates seeded so far, but the pool resolved to [medium,
-            # hard]) — fall back to the phase alone rather than crashing or
-            # returning nothing.
+            # hard]) — fall back to the phase (and requested type, if any)
+            # alone rather than crashing or returning nothing.
             templates = (
                 self.db.query(TaskTemplate)
-                .filter(TaskTemplate.phase == phase, TaskTemplate.is_active.is_(True))
+                .filter(TaskTemplate.phase == phase, TaskTemplate.is_active.is_(True), *type_filter)
                 .all()
             )
         if not templates:
-            raise NoTemplateAvailable(f"No active task templates for phase '{phase.value}'")
+            # Every template currently seeded in this project (across every
+            # task type, not just the two added in this phase) uses only
+            # phase="accueil" -- there is no montee_pression/pic_charge
+            # content yet. Without this fallback, a template-backed task
+            # type becomes entirely unplayable the moment SessionPhase
+            # advances past accueil (often after a single completed task),
+            # which contradicts the requirement that these task types stay
+            # genuinely playable for the life of a session. Falling back to
+            # "any active phase" for the requested type is the same
+            # graceful-degradation pattern as the difficulty-pool fallback
+            # above, not a redesign of phase/difficulty selection.
+            templates = (
+                self.db.query(TaskTemplate)
+                .filter(TaskTemplate.is_active.is_(True), *type_filter)
+                .all()
+            )
+        if not templates:
+            detail = f"No active task templates for phase '{phase.value}'"
+            if task_type is not None:
+                detail += f" and type '{task_type.value}'"
+            raise NoTemplateAvailable(detail)
 
         template = random.choice(templates)
 
-        generator = INSTANCE_GENERATORS.get(template.task_type)
-        if generator is None:
-            raise NoTemplateAvailable(
-                f"No instance generator registered for task_type '{template.task_type.value}'"
-            )
-
-        instance_data = generator(template.metadata_json)
+        # Task 03 (automatic task generation): document_organization,
+        # email_writing, and urgent_request each try controlled LLM
+        # generation first, falling back to their own deterministic
+        # generator on any failure -- see generate_document_organization_
+        # instance_controlled's own docstring for the exact contract every
+        # CONTROLLED_INSTANCE_GENERATORS entry follows. Every other task
+        # type is completely unaffected.
+        controlled_generator = CONTROLLED_INSTANCE_GENERATORS.get(template.task_type)
+        if controlled_generator is not None:
+            instance_data, generation_type, generation_prompt_version = controlled_generator(template.metadata_json)
+        else:
+            generator = INSTANCE_GENERATORS.get(template.task_type)
+            if generator is None:
+                raise NoTemplateAvailable(
+                    f"No instance generator registered for task_type '{template.task_type.value}'"
+                )
+            instance_data = generator(template.metadata_json)
+            generation_type = GenerationType.STATIC
+            generation_prompt_version = None
 
         # Re-fetches the snapshot (resolve_difficulty_pool_with_cooldown
         # already computed one above) rather than threading it through —
@@ -202,6 +249,8 @@ class TaskEngine:
             deadline_seconds=adjusted_deadline_seconds,
             status=TaskStatus.pending,
             priority=adjusted_priority,
+            generation_type=generation_type,
+            generation_prompt_version=generation_prompt_version,
         )
         self.db.add(task)
         self.db.commit()

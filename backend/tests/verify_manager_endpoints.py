@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import SessionLocal
 from app.models.manager_message import ManagerMessage
+from app.models.session import Session as SessionModel
 from app.orchestrators.performance_tracker import get_performance_snapshot
 from app.schemas.manager_message import ManagerMessageOut
 from app.schemas.performance_snapshot import PerformanceSnapshotOut
@@ -50,7 +51,11 @@ print()
 print(f"--- performance-snapshot: session {REAL_SESSION_ID} ---")
 snapshot = get_performance_snapshot(db, REAL_SESSION_ID, window_size=4)
 print(f"  raw dataclass: {snapshot}")
-out = PerformanceSnapshotOut(**asdict(snapshot))
+session = db.query(SessionModel).filter(SessionModel.id == REAL_SESSION_ID).first()
+# Mirrors app/api/sessions.py's own real endpoint construction exactly --
+# current_phase lives on Session, not on the performance-snapshot
+# dataclass itself, same reason the real route passes it explicitly.
+out = PerformanceSnapshotOut(**asdict(snapshot), current_phase=session.current_phase)
 print(f"  schema round-trip: {out.model_dump()}")
 
 db.close()

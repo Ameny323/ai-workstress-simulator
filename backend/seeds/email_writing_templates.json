@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Reply to the Client Delay Notice",
+    "description": "A client is asking for an update after their delivery was delayed. Write a professional reply that addresses their concerns.",
+    "task_type": "email_writing",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 300,
+    "default_priority": "medium",
+    "instructions": "Read the incoming request carefully, then write a reply covering everything it asks for.",
+    "metadata": {
+      "sender": "Morgan Reyes",
+      "sender_role": "Client Account Lead",
+      "subject": "Delivery delay -- need an update",
+      "context": "Our shipment to this client was delayed by two days due to a supplier issue. The client has already asked once and is getting anxious.",
+      "original_request": "Hi, our order still hasn't arrived and it's now two days late. Can you tell me exactly when it will ship, and whether we'll be compensated for the delay? We need this for a launch event.",
+      "objective": "Reassure the client, give them a concrete new delivery estimate, and address the compensation question honestly.",
+      "urgency": 3,
+      "required_points": ["new delivery date", "reason for the delay", "an apology or acknowledgement", "next steps or compensation"],
+      "forbidden_points": ["blaming the client", "making a compensation promise you cannot verify"],
+      "min_length": 120,
+      "max_length": 900
+    },
+    "is_active": true
+  },
+  {
+    "title": "Respond to the Internal Policy Question",
+    "description": "A colleague from another department is asking about the new remote-work policy. Write a clear, helpful reply.",
+    "task_type": "email_writing",
+    "difficulty": "easy",
+    "phase": "accueil",
+    "estimated_duration": 240,
+    "default_priority": "low",
+    "instructions": "Read the incoming request carefully, then write a reply covering everything it asks for.",
+    "metadata": {
+      "sender": "Priya Anand",
+      "sender_role": "Marketing Coordinator",
+      "subject": "Quick question about the new remote-work policy",
+      "context": "The company rolled out an updated remote-work policy last week. Several employees are confused about the details.",
+      "original_request": "Hey, I heard the remote-work policy changed. Do I still need manager approval for more than 2 remote days a week, and does this apply to contractors too?",
+      "objective": "Clearly answer both questions and point them to where the full policy document lives.",
+      "urgency": 1,
+      "required_points": ["manager approval requirement", "whether it applies to contractors", "where to find the full policy"],
+      "forbidden_points": [],
+      "min_length": 80,
+      "max_length": 600
+    },
+    "is_active": true
+  }
+]

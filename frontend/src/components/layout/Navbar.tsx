@@ -1,10 +1,18 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { useTime } from "../../hooks/useTime";
+
+const BREADCRUMBS: Record<string, [string, string]> = {
+  "/bureau": ["Dashboard", "Overview"],
+  "/tasks": ["Simulation", "Current Task"],
+};
 
 export default function Navbar() {
   const { user, session, notifications } = useApp();
   const now = useTime();
+  const { pathname } = useLocation();
+  const [section, page] = BREADCRUMBS[pathname] ?? ["Dashboard", "Overview"];
   const [showNotifs, setShowNotifs] = useState(false);
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -26,10 +34,8 @@ export default function Navbar() {
     <header
       style={{
         height: 60,
-        backgroundColor: "rgba(255,255,255,0.8)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        backgroundColor: "#27435D",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
         display: "flex",
         alignItems: "center",
         padding: "0 28px",
@@ -41,11 +47,11 @@ export default function Navbar() {
     >
       {/* Left: page title */}
       <div style={{ flex: 1 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#1A2B3C", letterSpacing: "-0.01em" }}>
-          Dashboard
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#fff", letterSpacing: "-0.01em" }}>
+          {section}
         </span>
-        <span style={{ color: "#94a3b8", margin: "0 6px", fontSize: 14 }}>/</span>
-        <span style={{ fontSize: 13, color: "#6B7A8D" }}>Overview</span>
+        <span style={{ color: "rgba(255,255,255,0.3)", margin: "0 6px", fontSize: 14 }}>/</span>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}>{page}</span>
       </div>
 
       {/* Right: controls */}
@@ -56,10 +62,10 @@ export default function Navbar() {
             display: "flex",
             alignItems: "center",
             gap: 7,
-            background: "rgba(0,0,0,0.04)",
+            background: "rgba(255,255,255,0.08)",
             padding: "5px 12px",
             borderRadius: 99,
-            border: "1px solid rgba(0,0,0,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
           <span
@@ -73,15 +79,15 @@ export default function Navbar() {
               flexShrink: 0,
             }}
           />
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1A2B3C" }}>{stateLabel}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{stateLabel}</span>
         </div>
 
         {/* Clock */}
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1A2B3C", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
             {timeStr}
           </div>
-          <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.2 }}>{dateStr}</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.2 }}>{dateStr}</div>
         </div>
 
         {/* Notifications */}
@@ -92,8 +98,8 @@ export default function Navbar() {
               width: 36,
               height: 36,
               borderRadius: 10,
-              border: "1px solid rgba(0,0,0,0.07)",
-              background: "white",
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "rgba(255,255,255,0.08)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -102,7 +108,7 @@ export default function Navbar() {
               transition: "background 0.15s",
             }}
           >
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#6B7A8D" strokeWidth={1.8}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.7)" strokeWidth={1.8}>
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
             </svg>
@@ -116,7 +122,7 @@ export default function Navbar() {
                   height: 7,
                   borderRadius: "50%",
                   backgroundColor: "#5B84C6",
-                  border: "1.5px solid white",
+                  border: "1.5px solid #27435D",
                 }}
               />
             )}
@@ -193,10 +199,10 @@ export default function Navbar() {
             {user.name.split(" ").map((n) => n[0]).join("")}
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2B3C", lineHeight: 1.2 }}>{user.name}</div>
-            <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.2 }}>{user.role}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1.2 }}>{user.name}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.2 }}>{user.role}</div>
           </div>
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.55)" strokeWidth={2}>
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>

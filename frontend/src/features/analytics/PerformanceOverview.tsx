@@ -79,6 +79,15 @@ function MetricCard({ label, value, unit, sub, color, bg, icon, trend, trendValu
   );
 }
 
+// AUDIT NOTE (behavioral-analysis foundation phase): every value and trend
+// on this page is hardcoded demo data -- `metrics` only ever gets set to
+// fixed numbers inside AppContext.startSimulation(), never from any real
+// backend analytics endpoint, and the "vs. 72% baseline"/trend-arrow
+// figures below are literal JSX constants, not derived from `metrics` at
+// all. This component lives on the legacy /bureau dashboard, not the real
+// backend-wired simulation flow (see TasksPage.tsx + GET /sessions/{id}/
+// report for the genuine, deterministic analytics). Labeled below rather
+// than silently presented as real so it can't be mistaken for it.
 export default function PerformanceOverview() {
   const { metrics } = useApp();
 
@@ -152,8 +161,19 @@ export default function PerformanceOverview() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#1A2B3C", letterSpacing: "-0.01em" }}>
-          Performance Overview
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1A2B3C", letterSpacing: "-0.01em" }}>
+            Performance Overview
+          </div>
+          <span
+            title="This preview panel shows placeholder data and is not connected to a real session. See the Session Report page for real, backend-computed analytics."
+            style={{
+              fontSize: 9.5, fontWeight: 700, color: "#B89A61", background: "rgba(184,154,97,0.12)",
+              padding: "2px 7px", borderRadius: 99, letterSpacing: "0.03em", textTransform: "uppercase",
+            }}
+          >
+            Demo data
+          </span>
         </div>
         <span style={{ fontSize: 12, color: "#94a3b8" }}>Last 2 hours</span>
       </div>
